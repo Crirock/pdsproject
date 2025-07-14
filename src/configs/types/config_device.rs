@@ -1,15 +1,13 @@
 //! Module defining the `ConfigDevice` struct, which allows to save and reload
 //! the application default configuration.
 
-use std::sync::{Arc, Mutex};
-
+use crate::networking::types::my_device::MyDevice;
+#[cfg(not(test))]
+use crate::utils::error_logger::{ErrorLogger, Location};
+#[cfg(not(test))]
+use crate::{SNIFFNET_LOWERCASE, location};
 use pcap::{Device, DeviceFlags};
 use serde::{Deserialize, Serialize};
-
-use crate::networking::types::my_device::MyDevice;
-use crate::networking::types::my_link_type::MyLinkType;
-#[cfg(not(test))]
-use crate::SNIFFNET_LOWERCASE;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct ConfigDevice {
@@ -40,27 +38,21 @@ impl ConfigDevice {
         if let Ok(device) = confy::load::<ConfigDevice>(SNIFFNET_LOWERCASE, Self::FILE_NAME) {
             device
         } else {
-            confy::store(SNIFFNET_LOWERCASE, Self::FILE_NAME, ConfigDevice::default())
-                .unwrap_or(());
+            let _ = confy::store(SNIFFNET_LOWERCASE, Self::FILE_NAME, ConfigDevice::default())
+                .log_err(location!());
             ConfigDevice::default()
         }
     }
 
     #[cfg(not(test))]
-    pub fn store(self) {
-        confy::store(SNIFFNET_LOWERCASE, Self::FILE_NAME, self).unwrap_or(());
+    pub fn store(self) -> Result<(), confy::ConfyError> {
+        confy::store(SNIFFNET_LOWERCASE, Self::FILE_NAME, self).log_err(location!())
     }
 
     pub fn to_my_device(&self) -> MyDevice {
         for device in Device::list().unwrap_or_default() {
             if device.name.eq(&self.device_name) {
-                return MyDevice {
-                    name: device.name,
-                    #[cfg(target_os = "windows")]
-                    desc: device.desc,
-                    addresses: Arc::new(Mutex::new(device.addresses)),
-                    link_type: MyLinkType::default(),
-                };
+                return MyDevice::from_pcap_device(device);
             }
         }
         let standard_device = Device::lookup().unwrap_or(None).unwrap_or_else(|| Device {
@@ -69,13 +61,7 @@ impl ConfigDevice {
             addresses: vec![],
             flags: DeviceFlags::empty(),
         });
-        MyDevice {
-            name: standard_device.name,
-            #[cfg(target_os = "windows")]
-            desc: standard_device.desc,
-            addresses: Arc::new(Mutex::new(standard_device.addresses)),
-            link_type: MyLinkType::default(),
-        }
+        MyDevice::from_pcap_device(standard_device)
     }
 }
 
@@ -93,8 +79,8 @@ mod tests {
                 .unwrap_or_else(|_| ConfigDevice::default())
         }
 
-        pub fn store(self) {
-            confy::store_path(ConfigDevice::test_path(), self).unwrap_or(());
+        pub fn store(self) -> Result<(), confy::ConfyError> {
+            confy::store_path(ConfigDevice::test_path(), self)
         }
     }
 }

@@ -2,8 +2,9 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 
 use etherparse::{Icmpv4Type, Icmpv6Type};
+use std::fmt::Write;
 
-#[derive(Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 pub enum IcmpType {
     V4(IcmpTypeV4),
     V6(IcmpTypeV6),
@@ -17,7 +18,7 @@ impl IcmpType {
         vec.sort_by(|(_, a), (_, b)| b.cmp(a));
 
         for (icmp_type, n) in vec {
-            ret_val.push_str(&format!("   {icmp_type} ({n})\n"));
+            let _ = writeln!(ret_val, "   {icmp_type} ({n})");
         }
         ret_val
     }
@@ -46,7 +47,7 @@ impl Display for IcmpType {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Hash, Default)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Default, Debug)]
 #[allow(clippy::module_name_repetitions)]
 pub enum IcmpTypeV4 {
     EchoReply,
@@ -162,7 +163,7 @@ impl Display for IcmpTypeV4 {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Hash, Default)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Default, Debug)]
 #[allow(clippy::module_name_repetitions)]
 pub enum IcmpTypeV6 {
     DestinationUnreachable,

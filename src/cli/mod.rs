@@ -1,11 +1,11 @@
 use clap::Parser;
-use iced::{window, Task};
+use iced::{Task, window};
 
+use crate::CONFIGS;
+use crate::Configs;
+use crate::SNIFFNET_LOWERCASE;
 use crate::gui::types::message::Message;
 use crate::utils::formatted_strings::APP_VERSION;
-use crate::Configs;
-use crate::CONFIGS;
-use crate::SNIFFNET_LOWERCASE;
 
 #[derive(Parser, Debug)]
 #[command(
@@ -50,14 +50,18 @@ pub fn handle_cli_args() -> Task<Message> {
     }
 
     if args.restore_default {
-        Configs::default().store();
+        if Configs::default().store().is_ok() {
+            println!("Restored default settings");
+        }
         std::process::exit(0);
     }
 
-    let mut boot_task_chain = window::get_latest().map(Message::WindowId);
+    let mut boot_task_chain = window::get_latest()
+        .map(Message::StartApp)
+        .chain(Task::done(Message::Periodic));
     if let Some(adapter) = args.adapter {
         boot_task_chain = boot_task_chain
-            .chain(Task::done(Message::AdapterSelection(adapter)))
+            .chain(Task::done(Message::DeviceSelection(adapter)))
             .chain(Task::done(Message::Start));
     }
 
@@ -66,8 +70,6 @@ pub fn handle_cli_args() -> Task<Message> {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::{Arc, Mutex};
-
     use serial_test::serial;
 
     use crate::configs::types::config_window::{PositionTuple, SizeTuple};
@@ -96,8 +98,7 @@ mod tests {
                 ),
                 notifications: Notifications {
                     volume: 100,
-                    packets_notification: Default::default(),
-                    bytes_notification: Default::default(),
+                    data_notification: Default::default(),
                     favorite_notification: Default::default(),
                 },
                 style: StyleType::Custom(ExtraStyles::DraculaDark),
@@ -114,18 +115,15 @@ mod tests {
         // we want to be sure that modified config is different from defaults
         assert_ne!(Configs::default(), modified_configs);
         //store modified configs
-        modified_configs.clone().store();
+        modified_configs.clone().store().unwrap();
         // assert they've been stored
         assert_eq!(Configs::load(), modified_configs);
         // restore defaults
-        Configs::default().store();
+        Configs::default().store().unwrap();
         // assert that defaults are stored
         assert_eq!(Configs::load(), Configs::default());
 
         // only needed because it will delete config files via its Drop implementation
-        Sniffer::new(
-            &Arc::new(Mutex::new(Configs::default())),
-            Arc::new(Mutex::new(Some(true))),
-        );
+        Sniffer::new(Configs::default());
     }
 }

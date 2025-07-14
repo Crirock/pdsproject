@@ -1,14 +1,14 @@
 use serde::{Deserialize, Serialize};
 
-use crate::notifications::types::sound::Sound;
 use crate::ByteMultiple;
+use crate::chart::types::chart_type::ChartType;
+use crate::notifications::types::sound::Sound;
 
 /// Used to contain the notifications configuration set by the user
 #[derive(Clone, Serialize, Deserialize, Copy, PartialEq, Debug)]
 pub struct Notifications {
     pub volume: u8,
-    pub packets_notification: PacketsNotification,
-    pub bytes_notification: BytesNotification,
+    pub data_notification: DataNotification,
     pub favorite_notification: FavoriteNotification,
 }
 
@@ -16,8 +16,7 @@ impl Default for Notifications {
     fn default() -> Self {
         Notifications {
             volume: 60,
-            packets_notification: PacketsNotification::default(),
-            bytes_notification: BytesNotification::default(),
+            data_notification: DataNotification::default(),
             favorite_notification: FavoriteNotification::default(),
         }
     }
@@ -26,54 +25,16 @@ impl Default for Notifications {
 /// Enum representing the possible notifications.
 #[derive(Debug, Clone, Copy)]
 pub enum Notification {
-    /// Packets notification
-    Packets(PacketsNotification),
-    /// Bytes notification
-    Bytes(BytesNotification),
+    /// Data notification
+    Data(DataNotification),
     /// Favorites notification
     Favorite(FavoriteNotification),
 }
 
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize, Debug, Copy)]
-pub struct PacketsNotification {
-    /// Threshold of received + sent bytes; if exceeded a notification is emitted
-    pub threshold: Option<u32>,
-    /// The sound to emit
-    pub sound: Sound,
-    /// The last used Some value for the threshold field
-    pub previous_threshold: u32,
-}
-
-impl Default for PacketsNotification {
-    fn default() -> Self {
-        PacketsNotification {
-            threshold: None,
-            sound: Sound::Gulp,
-            previous_threshold: 750,
-        }
-    }
-}
-
-impl PacketsNotification {
-    /// Arbitrary string constructor. Will fallback values to existing notification if set, or default otherwise
-    pub fn from(value: &str, existing: Option<Self>) -> Self {
-        let default = existing.unwrap_or_default();
-
-        let new_threshold = if value.is_empty() {
-            0
-        } else {
-            value.parse().unwrap_or(default.previous_threshold)
-        };
-        Self {
-            threshold: Some(new_threshold),
-            previous_threshold: new_threshold,
-            ..default
-        }
-    }
-}
-
-#[derive(Clone, Eq, PartialEq, Serialize, Deserialize, Debug, Copy)]
-pub struct BytesNotification {
+pub struct DataNotification {
+    /// Data representation
+    pub chart_type: ChartType,
     /// Threshold of received + sent bytes; if exceeded a notification is emitted
     pub threshold: Option<u64>,
     /// B, KB, MB or GB
@@ -84,9 +45,10 @@ pub struct BytesNotification {
     pub previous_threshold: u64,
 }
 
-impl Default for BytesNotification {
+impl Default for DataNotification {
     fn default() -> Self {
-        BytesNotification {
+        DataNotification {
+            chart_type: ChartType::Bytes,
             threshold: None,
             byte_multiple: ByteMultiple::KB,
             sound: Sound::Pop,
@@ -95,30 +57,32 @@ impl Default for BytesNotification {
     }
 }
 
-impl BytesNotification {
+impl DataNotification {
     /// Arbitrary string constructor. Will fallback values to existing notification if set, or default otherwise
     pub fn from(value: &str, existing: Option<Self>) -> Self {
         let default = existing.unwrap_or_default();
 
         let mut byte_multiple_inserted = ByteMultiple::B;
-        let new_threshold = if value.is_empty() {
+        let chars: Vec<char> = value.trim().chars().collect();
+        let new_threshold = if chars.is_empty() {
             0
-        } else if !value.trim().chars().map(char::is_numeric).any(|x| !x) {
+        } else if !chars.iter().map(|c| char::is_numeric(*c)).any(|x| !x) {
             // no multiple
             value.parse::<u64>().unwrap_or(default.previous_threshold)
         } else {
             // multiple
-            let last_char = value.chars().last().unwrap();
-            byte_multiple_inserted = ByteMultiple::from_char(last_char);
-            let without_multiple = value[0..value.len() - 1].trim().to_string();
+            let last_char = chars.last().unwrap_or(&' ');
+            byte_multiple_inserted = ByteMultiple::from_char(*last_char);
+            let without_multiple: String = chars[0..chars.len() - 1].iter().collect();
             if without_multiple.parse::<u64>().is_ok()
                 && TryInto::<u64>::try_into(
-                    without_multiple.parse::<u128>().unwrap()
+                    without_multiple.parse::<u128>().unwrap_or_default()
                         * u128::from(byte_multiple_inserted.multiplier()),
                 )
                 .is_ok()
             {
-                without_multiple.parse::<u64>().unwrap() * byte_multiple_inserted.multiplier()
+                without_multiple.parse::<u64>().unwrap_or_default()
+                    * byte_multiple_inserted.multiplier()
             } else if without_multiple.is_empty() {
                 byte_multiple_inserted = ByteMultiple::B;
                 0
@@ -178,35 +142,43 @@ mod tests {
     use super::*;
 
     #[rstest]
-    #[case("123", BytesNotification {
-        previous_threshold: 123, threshold: Some(123), byte_multiple: ByteMultiple::B, ..BytesNotification::default() })]
-    #[case("500k", BytesNotification {
-        previous_threshold: 500_000, threshold: Some(500_000),byte_multiple: ByteMultiple::KB, ..BytesNotification::default() })]
-    #[case("420 m", BytesNotification {
-        previous_threshold: 420_000_000, threshold: Some(420_000_000),byte_multiple: ByteMultiple::MB, ..BytesNotification::default() })]
-    #[case("foob@r", BytesNotification{
-        threshold: Some(800000),
-        ..Default::default()
-    })]
-    #[case(" 888 g", BytesNotification {
-        previous_threshold: 888_000_000_000, threshold: Some(888_000_000_000),byte_multiple: ByteMultiple::GB, ..BytesNotification::default() })]
+    #[case("123",
+        DataNotification{
+        previous_threshold: 123, threshold: Some(123), byte_multiple: ByteMultiple::B, ..DataNotification::default() }
+    )]
+    #[case("500k",
+        DataNotification{
+        previous_threshold: 500_000, threshold: Some(500_000),byte_multiple: ByteMultiple::KB, ..DataNotification::default() }
+    )]
+    #[case("420m",
+        DataNotification{
+        previous_threshold: 420_000_000, threshold: Some(420_000_000),byte_multiple: ByteMultiple::MB, ..DataNotification::default() }
+    )]
+    #[case("744ь",
+        DataNotification{
+    previous_threshold: 744, threshold: Some(744),byte_multiple: ByteMultiple::B, ..DataNotification::default() }
+    )]
+    #[case("888g",
+        DataNotification{
+        previous_threshold: 888_000_000_000, threshold: Some(888_000_000_000),byte_multiple: ByteMultiple::GB, ..DataNotification::default() }
+    )]
     fn test_can_instantiate_bytes_notification_from_string(
         #[case] input: &str,
-        #[case] expected: BytesNotification,
+        #[case] expected: DataNotification,
     ) {
-        assert_eq!(expected, BytesNotification::from(input, None));
+        assert_eq!(expected, DataNotification::from(input, None));
     }
 
     #[rstest]
     #[case("foob@r")]
     #[case("2O6")]
     fn test_will_reuse_previous_value_if_cannot_parse(#[case] input: &str) {
-        let existing_notification = BytesNotification {
+        let existing_notification = DataNotification {
             previous_threshold: 420_000_000_000,
             byte_multiple: ByteMultiple::GB,
             ..Default::default()
         };
-        let expected = BytesNotification {
+        let expected = DataNotification {
             previous_threshold: 420_000_000_000,
             threshold: Some(420_000_000_000),
             byte_multiple: ByteMultiple::GB,
@@ -214,7 +186,7 @@ mod tests {
         };
         assert_eq!(
             expected,
-            BytesNotification::from(input, Some(existing_notification))
+            DataNotification::from(input, Some(existing_notification))
         );
     }
 
@@ -248,27 +220,5 @@ mod tests {
                 sound: Sound::None
             }
         );
-    }
-
-    #[rstest]
-    #[case("123", PacketsNotification {
-        previous_threshold: 123,
-        threshold: Some(123),
-        ..PacketsNotification::default() })]
-    #[case("8888", PacketsNotification {
-        previous_threshold: 8888,
-        threshold: Some(8888),
-        ..PacketsNotification::default() })]
-    #[case("420 m", PacketsNotification {
-        threshold: Some(750),
-        ..PacketsNotification::default() })]
-    #[case("foob@r", PacketsNotification {
-        threshold: Some(750),
-        ..PacketsNotification::default() })]
-    fn test_can_instantiate_packet_notification_from_string(
-        #[case] input: &str,
-        #[case] expected: PacketsNotification,
-    ) {
-        assert_eq!(expected, PacketsNotification::from(input, None));
     }
 }

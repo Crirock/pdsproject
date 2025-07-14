@@ -1,8 +1,7 @@
-use once_cell::sync::Lazy;
-
 use crate::{ConfigDevice, ConfigSettings, ConfigWindow};
+use confy::ConfyError;
 
-pub static CONFIGS: Lazy<Configs> = Lazy::new(Configs::load);
+pub static CONFIGS: std::sync::LazyLock<Configs> = std::sync::LazyLock::new(Configs::load);
 
 #[derive(Default, Clone, PartialEq, Debug)]
 pub struct Configs {
@@ -22,9 +21,10 @@ impl Configs {
         }
     }
 
-    pub fn store(self) {
-        self.settings.store();
-        self.device.store();
-        self.window.store();
+    pub fn store(self) -> Result<(), ConfyError> {
+        self.settings.store()?;
+        self.device.store()?;
+        self.window.store()?;
+        Ok(())
     }
 }

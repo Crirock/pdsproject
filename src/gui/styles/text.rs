@@ -2,12 +2,11 @@
 
 #![allow(clippy::module_name_repetitions)]
 
+use crate::StyleType;
+use crate::gui::types::message::Message;
 use iced::widget::text::{Catalog, Style};
 use iced::widget::{Column, Text};
 use iced::{Color, Font};
-
-use crate::gui::types::message::Message;
-use crate::StyleType;
 
 #[derive(Copy, Clone, Default, PartialEq)]
 pub enum TextType {
@@ -19,7 +18,6 @@ pub enum TextType {
     Subtitle,
     Danger,
     Sponsor,
-    Starred,
 }
 
 /// Returns a formatted caption followed by subtitle, new line, tab, and desc
@@ -51,6 +49,7 @@ impl TextType {
 
 pub fn highlight(style: &StyleType, element: TextType) -> Color {
     let colors = style.get_palette();
+    let ext = style.get_extension();
     let secondary = colors.secondary;
     let is_nightly = style.get_extension().is_nightly;
     match element {
@@ -74,10 +73,8 @@ pub fn highlight(style: &StyleType, element: TextType) -> Color {
         }
         TextType::Incoming => colors.secondary,
         TextType::Outgoing => colors.outgoing,
-        TextType::Danger => Color::from_rgb(0.8, 0.15, 0.15),
-        TextType::Sponsor => Color::from_rgb(1.0, 0.3, 0.5),
+        TextType::Danger | TextType::Sponsor => ext.red_alert_color,
         TextType::Standard => colors.text_body,
-        TextType::Starred => colors.starred,
     }
 }
 

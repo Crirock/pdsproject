@@ -1,42 +1,45 @@
 use std::cmp::min;
 use std::net::IpAddr;
 
+use crate::Language;
 use crate::networking::types::filters::Filters;
 use crate::translations::translations::{
     address_translation, ip_version_translation, protocol_translation,
 };
 use crate::translations::translations_3::{invalid_filters_translation, port_translation};
-use crate::Language;
+use crate::utils::types::timestamp::Timestamp;
+use chrono::{Local, TimeZone};
+use std::fmt::Write;
 
 /// Application version number (to be displayed in gui footer)
 pub const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// Computes the String representing the percentage of filtered bytes/packets
-pub fn get_percentage_string(observed: u128, filtered: u128) -> String {
-    #[allow(clippy::cast_precision_loss)]
-    let filtered_float = filtered as f32;
-    #[allow(clippy::cast_precision_loss)]
-    let observed_float = observed as f32;
-    if format!("{:.1}", 100.0 * filtered_float / observed_float).eq("0.0") {
-        "<0.1%".to_string()
-    } else {
-        format!("{:.1}%", 100.0 * filtered_float / observed_float)
-    }
-}
+// /// Computes the String representing the percentage of filtered bytes/packets
+// pub fn get_percentage_string(observed: u128, filtered: u128) -> String {
+//     #[allow(clippy::cast_precision_loss)]
+//     let filtered_float = filtered as f32;
+//     #[allow(clippy::cast_precision_loss)]
+//     let observed_float = observed as f32;
+//     if format!("{:.1}", 100.0 * filtered_float / observed_float).eq("0.0") {
+//         "<0.1%".to_string()
+//     } else {
+//         format!("{:.1}%", 100.0 * filtered_float / observed_float)
+//     }
+// }
 
 pub fn get_invalid_filters_string(filters: &Filters, language: Language) -> String {
     let mut ret_val = format!("{}:", invalid_filters_translation(language));
     if !filters.ip_version_valid() {
-        ret_val.push_str(&format!("\n • {}", ip_version_translation(language)));
+        let _ = write!(ret_val, "\n • {}", ip_version_translation(language));
     }
     if !filters.protocol_valid() {
-        ret_val.push_str(&format!("\n • {}", protocol_translation(language)));
+        let _ = write!(ret_val, "\n • {}", protocol_translation(language));
     }
     if !filters.address_valid() {
-        ret_val.push_str(&format!("\n • {}", address_translation(language)));
+        let _ = write!(ret_val, "\n • {}", address_translation(language));
     }
     if !filters.port_valid() {
-        ret_val.push_str(&format!("\n • {}", port_translation(language)));
+        let _ = write!(ret_val, "\n • {}", port_translation(language));
     }
     ret_val
 }
@@ -45,59 +48,52 @@ pub fn get_invalid_filters_string(filters: &Filters, language: Language) -> Stri
 pub fn get_active_filters_string(filters: &Filters, language: Language) -> String {
     let mut filters_string = String::new();
     if filters.ip_version_active() {
-        filters_string.push_str(&format!(
-            "• {}: {}\n",
+        let _ = writeln!(
+            filters_string,
+            "• {}: {}",
             ip_version_translation(language),
             filters.pretty_print_ip()
-        ));
+        );
     }
     if filters.protocol_active() {
-        filters_string.push_str(&format!(
-            "• {}: {}\n",
+        let _ = writeln!(
+            filters_string,
+            "• {}: {}",
             protocol_translation(language),
             filters.pretty_print_protocol()
-        ));
+        );
     }
     if filters.address_active() {
-        filters_string.push_str(&format!(
-            "• {}: {}\n",
+        let _ = writeln!(
+            filters_string,
+            "• {}: {}",
             address_translation(language),
             filters.address_str
-        ));
+        );
     }
     if filters.port_active() {
-        filters_string.push_str(&format!(
-            "• {}: {}\n",
+        let _ = writeln!(
+            filters_string,
+            "• {}: {}",
             port_translation(language),
             filters.port_str
-        ));
+        );
     }
     filters_string
 }
 
 pub fn print_cli_welcome_message() {
+    let ver = APP_VERSION;
     print!(
-        r"
-  /---------------------------------------------------------\
- |     _____           _    __    __                  _      |
- |    / ____|         (_)  / _|  / _|                | |     |
- |   | (___    _ __    _  | |_  | |_   _ __     ___  | |_    |
- |    \___ \  | '_ \  | | |  _| |  _| | '_ \   / _ \ | __|   |
- |    ____) | | | | | | | | |   | |   | | | | |  __/ | |_    |
- |   |_____/  |_| |_| |_| |_|   |_|   |_| |_|  \___|  \__|   |
- |                                                           |
- |                   ___________                             |
- |                  /___________\                            |
- |                 | ___________ |                           |
- |                 | |         | |                           |
- |                 | | v{APP_VERSION}  | |                           |
- |                 | |_________| |________________________   |
- |                 \_____________/   by Giuliano Bellini  )  |
- |                 / ''''''''''' \                       /   |
- |                / ::::::::::::: \                  =D-'    |
- |               (_________________)                         |
-  \_________________________________________________________/
-    "
+        "\n\
+╭────────────────────────────────────────────────────────────────────╮\n\
+│                                                                    │\n\
+│                           Sniffnet {ver}                           │\n\
+│                                                                    │\n\
+│           → Website: https://sniffnet.net                          │\n\
+│           → GitHub:  https://github.com/GyulyVGC/sniffnet          │\n\
+│                                                                    │\n\
+╰────────────────────────────────────────────────────────────────────╯\n\n"
     );
 }
 
@@ -107,25 +103,28 @@ pub fn get_domain_from_r_dns(r_dns: String) -> String {
         r_dns
     } else {
         let parts: Vec<&str> = r_dns.split('.').collect();
-        if parts.len() >= 2 {
-            parts
-                .get(parts.len() - 2..)
-                .unwrap_or(&parts)
-                .iter()
-                .fold(Vec::new(), |mut vec, part| {
-                    vec.push((*part).to_string());
-                    vec
-                })
-                .join(".")
+        let len = parts.len();
+        if len >= 2 {
+            let last = parts.get(len - 1).unwrap_or(&"");
+            let second_last = parts.get(len - 2).unwrap_or(&"");
+            if last.len() > 3 || second_last.len() > 3 {
+                format!("{second_last}.{last}")
+            } else {
+                let third_last_opt = len.checked_sub(3).and_then(|i| parts.get(i));
+                match third_last_opt {
+                    Some(third_last) => format!("{third_last}.{second_last}.{last}"),
+                    None => format!("{second_last}.{last}"),
+                }
+            }
         } else {
             r_dns
         }
     }
 }
 
-pub fn get_socket_address(address: &String, port: Option<u16>) -> String {
+pub fn get_socket_address(address: &IpAddr, port: Option<u16>) -> String {
     if let Some(res) = port {
-        if address.contains(':') {
+        if address.is_ipv6() {
             // IPv6
             format!("[{address}]:{res}")
         } else {
@@ -133,7 +132,7 @@ pub fn get_socket_address(address: &String, port: Option<u16>) -> String {
             format!("{address}:{res}")
         }
     } else {
-        address.to_owned()
+        address.to_string()
     }
 }
 
@@ -165,6 +164,17 @@ pub fn get_formatted_num_seconds(num_seconds: u128) -> String {
     }
 }
 
+pub fn get_formatted_timestamp(t: Timestamp) -> String {
+    let date_opt = t
+        .to_usecs()
+        .and_then(|usecs| Local.timestamp_micros(usecs).latest());
+    if let Some(date) = date_opt {
+        date.format("%Y/%m/%d %H:%M:%S").to_string()
+    } else {
+        "?".to_string()
+    }
+}
+
 #[allow(dead_code)]
 #[cfg(windows)]
 pub fn get_logs_file_path() -> Option<String> {
@@ -174,8 +184,8 @@ pub fn get_logs_file_path() -> Option<String> {
 }
 
 #[cfg(all(windows, not(debug_assertions)))]
-pub fn redirect_stdout_stderr_to_file(
-) -> Option<(gag::Redirect<std::fs::File>, gag::Redirect<std::fs::File>)> {
+pub fn redirect_stdout_stderr_to_file()
+-> Option<(gag::Redirect<std::fs::File>, gag::Redirect<std::fs::File>)> {
     if let Ok(logs_file) = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
@@ -231,5 +241,34 @@ mod tests {
         let file_path = std::path::PathBuf::from(get_logs_file_path().unwrap());
         assert!(file_path.is_absolute());
         assert_eq!(file_path.file_name().unwrap(), "logs.txt");
+    }
+
+    #[test]
+    fn test_get_domain_from_r_dns() {
+        let f = |s: &str| get_domain_from_r_dns(s.to_string());
+        assert_eq!(f(""), "");
+        assert_eq!(f("8.8.8.8"), "8.8.8.8");
+        assert_eq!(f("a.b.c.d"), "b.c.d");
+        assert_eq!(f("ciao.xyz"), "ciao.xyz");
+        assert_eq!(f("bye.ciao.xyz"), "ciao.xyz");
+        assert_eq!(f("ciao.bye.xyz"), "ciao.bye.xyz");
+        assert_eq!(f("hola.ciao.bye.xyz"), "ciao.bye.xyz");
+        assert_eq!(f(".bye.xyz"), ".bye.xyz");
+        assert_eq!(f("bye.xyz"), "bye.xyz");
+        assert_eq!(f("hola.ciao.b"), "ciao.b");
+        assert_eq!(f("hola.b.ciao"), "b.ciao");
+        assert_eq!(f("ciao."), "ciao.");
+        assert_eq!(f("ciao.."), "ciao..");
+        assert_eq!(f(".ciao."), "ciao.");
+        assert_eq!(f("ciao.bye."), "ciao.bye.");
+        assert_eq!(f("ciao..."), "..");
+        assert_eq!(f("..bye"), "..bye");
+        assert_eq!(f("ciao..bye"), "ciao..bye");
+        assert_eq!(f("..ciao"), ".ciao");
+        assert_eq!(f("bye..ciao"), ".ciao");
+        assert_eq!(f("."), ".");
+        assert_eq!(f(".."), "..");
+        assert_eq!(f("..."), "..");
+        assert_eq!(f("no_dots_in_this"), "no_dots_in_this");
     }
 }

@@ -1,11 +1,5 @@
 use std::net::IpAddr;
 
-use iced::widget::scrollable::Direction;
-use iced::widget::tooltip::Position;
-use iced::widget::{button, horizontal_space, lazy, vertical_space, Rule, Scrollable};
-use iced::widget::{Column, Container, Row, Text, Tooltip};
-use iced::{Alignment, Font, Length, Padding};
-
 use crate::countries::country_utils::{get_computer_tooltip, get_flag_tooltip};
 use crate::gui::components::button::button_hide;
 use crate::gui::styles::container::ContainerType;
@@ -19,6 +13,7 @@ use crate::networking::manage_packets::{
     get_address_to_lookup, get_traffic_type, is_local_connection, is_my_address,
 };
 use crate::networking::types::address_port_pair::AddressPortPair;
+use crate::networking::types::arp_type::ArpType;
 use crate::networking::types::bogon::is_bogon;
 use crate::networking::types::host::Host;
 use crate::networking::types::icmp_type::IcmpType;
@@ -36,22 +31,21 @@ use crate::translations::translations_2::{
 use crate::translations::translations_3::{
     copy_translation, messages_translation, service_translation,
 };
-use crate::utils::formatted_strings::get_socket_address;
+use crate::utils::formatted_strings::{get_formatted_timestamp, get_socket_address};
 use crate::utils::types::icon::Icon;
 use crate::{ByteMultiple, ConfigSettings, Language, Protocol, Sniffer, StyleType};
+use iced::alignment::Vertical;
+use iced::widget::scrollable::Direction;
+use iced::widget::tooltip::Position;
+use iced::widget::{Column, Container, Row, Text, Tooltip};
+use iced::widget::{Rule, Scrollable, button, horizontal_space, vertical_space};
+use iced::{Alignment, Font, Length, Padding};
 
 pub fn connection_details_page(
     sniffer: &Sniffer,
     key: AddressPortPair,
 ) -> Container<Message, StyleType> {
-    Container::new(lazy(
-        (
-            sniffer.runtime_data.tot_out_packets + sniffer.runtime_data.tot_in_packets,
-            sniffer.timing_events.was_just_copy_ip(&key.address1),
-            sniffer.timing_events.was_just_copy_ip(&key.address2),
-        ),
-        move |_| page_content(sniffer, &key),
-    ))
+    Container::new(page_content(sniffer, &key))
 }
 
 fn page_content<'a>(sniffer: &Sniffer, key: &AddressPortPair) -> Container<'a, Message, StyleType> {
@@ -60,25 +54,22 @@ fn page_content<'a>(sniffer: &Sniffer, key: &AddressPortPair) -> Container<'a, M
         language,
         color_gradient,
         ..
-    } = sniffer.configs.lock().unwrap().settings;
+    } = sniffer.configs.settings;
     let font = style.get_extension().font;
     let font_headers = style.get_extension().font_headers;
 
-    let info_traffic_lock = sniffer
-        .info_traffic
-        .lock()
-        .expect("Error acquiring mutex\n\r");
-    let val = info_traffic_lock.map.get(key).unwrap().clone();
+    let info_traffic = &sniffer.info_traffic;
+    let val = info_traffic
+        .map
+        .get(key)
+        .unwrap_or(&InfoAddressPortPair::default())
+        .clone();
     let address_to_lookup = get_address_to_lookup(key, val.traffic_direction);
-    let host_option = info_traffic_lock
-        .addresses_resolved
-        .get(&address_to_lookup)
-        .cloned();
-    let host_info_option = info_traffic_lock
+    let host_option = sniffer.addresses_resolved.get(&address_to_lookup).cloned();
+    let host_info_option = info_traffic
         .hosts
         .get(&host_option.clone().unwrap_or_default().1)
         .copied();
-    drop(info_traffic_lock);
 
     let header_and_content = Column::new().width(Length::Fill).push(page_header(
         font,
@@ -185,6 +176,7 @@ fn col_info<'a>(
     language: Language,
 ) -> Column<'a, Message, StyleType> {
     let is_icmp = key.protocol.eq(&Protocol::ICMP);
+    let is_arp = key.protocol.eq(&Protocol::ARP);
 
     let mut ret_val = Column::new()
         .spacing(10)
@@ -192,14 +184,18 @@ fn col_info<'a>(
         .width(Length::FillPortion(2))
         .push(vertical_space())
         .push(
-            Row::new().spacing(5).push(Icon::Clock.to_text()).push(
-                Text::new(format!(
-                    "{} - {}",
-                    val.initial_timestamp.to_string().get(11..19).unwrap(),
-                    val.final_timestamp.to_string().get(11..19).unwrap()
-                ))
-                .font(font),
-            ),
+            Row::new()
+                .spacing(8)
+                .align_y(Vertical::Center)
+                .push(Icon::Clock.to_text())
+                .push(
+                    Text::new(format!(
+                        "{}\n{}",
+                        get_formatted_timestamp(val.initial_timestamp),
+                        get_formatted_timestamp(val.final_timestamp)
+                    ))
+                    .font(font),
+                ),
         )
         .push(TextType::highlighted_subtitle_with_desc(
             protocol_translation(language),
@@ -207,7 +203,7 @@ fn col_info<'a>(
             font,
         ));
 
-    if !is_icmp {
+    if !is_icmp && !is_arp {
         ret_val = ret_val.push(TextType::highlighted_subtitle_with_desc(
             service_translation(language),
             &val.service.to_string(),
@@ -234,7 +230,7 @@ fn col_info<'a>(
         font,
     ));
 
-    if is_icmp {
+    if is_icmp || is_arp {
         ret_val = ret_val.push(
             Column::new()
                 .push(
@@ -245,7 +241,14 @@ fn col_info<'a>(
                 .push(Scrollable::with_direction(
                     Column::new()
                         .padding(Padding::ZERO.right(10).bottom(10))
-                        .push(Text::new(IcmpType::pretty_print_types(&val.icmp_types)).font(font)),
+                        .push(
+                            Text::new(if is_icmp {
+                                IcmpType::pretty_print_types(&val.icmp_types)
+                            } else {
+                                ArpType::pretty_print_types(&val.arp_types)
+                            })
+                            .font(font),
+                        ),
                     Direction::Both {
                         vertical: ScrollbarType::properties(),
                         horizontal: ScrollbarType::properties(),
@@ -289,19 +292,19 @@ fn get_host_info_col<'a>(
 
 fn get_local_tooltip<'a>(
     sniffer: &Sniffer,
-    address_to_lookup: &str,
+    address_to_lookup: &IpAddr,
     key: &AddressPortPair,
 ) -> Tooltip<'a, Message, StyleType> {
     let ConfigSettings {
         style, language, ..
-    } = sniffer.configs.lock().unwrap().settings;
+    } = sniffer.configs.settings;
 
     let local_address = if address_to_lookup.eq(&key.address1) {
         &key.address2
     } else {
         &key.address1
     };
-    let my_interface_addresses = &*sniffer.device.addresses.lock().unwrap();
+    let my_interface_addresses = sniffer.capture_source.get_addresses();
     get_computer_tooltip(
         is_my_address(local_address, my_interface_addresses),
         is_local_connection(local_address, my_interface_addresses),
@@ -322,7 +325,7 @@ fn get_local_tooltip<'a>(
 
 fn get_src_or_dest_col<'a>(
     caption: Row<'a, Message, StyleType>,
-    ip: &String,
+    ip: &IpAddr,
     port: Option<u16>,
     mac: Option<&String>,
     font: Font,
@@ -397,10 +400,10 @@ fn assemble_widgets<'a>(
 fn get_button_copy<'a>(
     language: Language,
     font: Font,
-    string: &String,
+    ip: &IpAddr,
     timing_events: &TimingEvents,
 ) -> Tooltip<'a, Message, StyleType> {
-    let icon = if timing_events.was_just_copy_ip(string) {
+    let icon = if timing_events.was_just_copy_ip(ip) {
         Text::new("✔").font(font).size(14)
     } else {
         Icon::Copy.to_text().size(12)
@@ -410,7 +413,7 @@ fn get_button_copy<'a>(
         .padding(0)
         .height(25)
         .width(25)
-        .on_press(Message::CopyIp(string.clone()));
+        .on_press(Message::CopyIp(*ip));
 
     Tooltip::new(
         content,

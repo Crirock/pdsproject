@@ -188,7 +188,8 @@
       "avatar_url": "https://avatars.githubusercontent.com/u/79985743?v=4",
       "profile": "http://index45.com",
       "contributions": [
-        "translation"
+        "translation",
+        "code"
       ]
     },
     {
@@ -583,6 +584,115 @@
       "contributions": [
         "design",
         "a11y"
+      ]
+    },
+    {
+      "login": "TyseEX",
+      "name": "TyseEX",
+      "avatar_url": "https://avatars.githubusercontent.com/u/102823177?v=4",
+      "profile": "https://github.com/TyseEX",
+      "contributions": [
+        "bug"
+      ]
+    },
+    {
+      "login": "shu-kitamura",
+      "name": "shu-kitamura",
+      "avatar_url": "https://avatars.githubusercontent.com/u/171437458?v=4",
+      "profile": "https://github.com/shu-kitamura",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "pcwizz",
+      "name": "Morgan Hill",
+      "avatar_url": "https://avatars.githubusercontent.com/u/1645637?v=4",
+      "profile": "http://pcwizz.net",
+      "contributions": [
+        "security"
+      ]
+    },
+    {
+      "login": "PeterDaveHello",
+      "name": "Peter Dave Hello",
+      "avatar_url": "https://avatars.githubusercontent.com/u/3691490?v=4",
+      "profile": "https://www.peterdavehello.org/",
+      "contributions": [
+        "translation"
+      ]
+    },
+    {
+      "login": "mhansma96",
+      "name": "Michel Hansma",
+      "avatar_url": "https://avatars.githubusercontent.com/u/84068842?v=4",
+      "profile": "https://github.com/mhansma96",
+      "contributions": [
+        "design",
+        "a11y"
+      ]
+    },
+    {
+      "login": "domcyrus",
+      "name": "Marco Cadetg",
+      "avatar_url": "https://avatars.githubusercontent.com/u/884083?v=4",
+      "profile": "https://github.com/domcyrus",
+      "contributions": [
+        "platform"
+      ]
+    },
+    {
+      "login": "nubikripto",
+      "name": "Nubi",
+      "avatar_url": "https://avatars.githubusercontent.com/u/35731885?v=4",
+      "profile": "https://nubikripto.my.id",
+      "contributions": [
+        "translation"
+      ]
+    },
+    {
+      "login": "iwan-uschka",
+      "name": "Christoph Wanja",
+      "avatar_url": "https://avatars.githubusercontent.com/u/2256579?v=4",
+      "profile": "https://toto.io",
+      "contributions": [
+        "financial"
+      ]
+    },
+    {
+      "login": "aguacero7",
+      "name": "Aguacero 🌧️",
+      "avatar_url": "https://avatars.githubusercontent.com/u/72492241?v=4",
+      "profile": "https://github.com/aguacero7",
+      "contributions": [
+        "translation"
+      ]
+    },
+    {
+      "login": "rons4",
+      "name": "Ron",
+      "avatar_url": "https://avatars.githubusercontent.com/u/43244104?v=4",
+      "profile": "https://www.signl4.com",
+      "contributions": [
+        "ideas"
+      ]
+    },
+    {
+      "login": "ADS-Fund",
+      "name": "ADS Fund",
+      "avatar_url": "https://avatars.githubusercontent.com/u/202042116?v=4",
+      "profile": "https://ads.fund",
+      "contributions": [
+        "financial"
+      ]
+    },
+    {
+      "login": "louis-ym4",
+      "name": "louis-ym4",
+      "avatar_url": "https://avatars.githubusercontent.com/u/200361621?v=4",
+      "profile": "https://github.com/louis-ym4",
+      "contributions": [
+        "design"
       ]
     }
   ],

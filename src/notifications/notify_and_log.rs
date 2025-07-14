@@ -1,116 +1,138 @@
-use std::sync::Mutex;
-
-use chrono::Local;
-
+use crate::InfoTraffic;
+use crate::chart::types::chart_type::ChartType;
+use crate::networking::types::capture_context::CaptureSource;
+use crate::networking::types::data_info::DataInfo;
+use crate::networking::types::data_info_host::DataInfoHost;
+use crate::networking::types::host::Host;
+use crate::networking::types::service::Service;
 use crate::notifications::types::logged_notification::{
-    BytesThresholdExceeded, FavoriteTransmitted, LoggedNotification, PacketsThresholdExceeded,
+    DataThresholdExceeded, FavoriteTransmitted, LoggedNotification,
 };
 use crate::notifications::types::notifications::Notifications;
-use crate::notifications::types::sound::{play, Sound};
-use crate::{InfoTraffic, RunTimeData};
+use crate::notifications::types::sound::{Sound, play};
+use crate::report::types::sort_type::SortType;
+use crate::utils::formatted_strings::get_formatted_timestamp;
+use std::cmp::min;
+use std::collections::{HashSet, VecDeque};
 
 /// Checks if one or more notifications have to be emitted and logs them.
 ///
 /// It returns the number of new notifications emitted
 pub fn notify_and_log(
-    runtime_data: &mut RunTimeData,
+    logged_notifications: &mut (VecDeque<LoggedNotification>, usize),
     notifications: Notifications,
-    info_traffic: &Mutex<InfoTraffic>,
+    info_traffic_msg: &InfoTraffic,
+    favorites: &HashSet<Host>,
+    cs: &CaptureSource,
 ) -> usize {
-    let mut already_emitted_sound = false;
-    let mut emitted_notifications = 0;
-    // packets threshold
-    if notifications.packets_notification.threshold.is_some() {
-        let sent_packets_entry = runtime_data.tot_out_packets - runtime_data.tot_out_packets_prev;
-        let received_packets_entry = runtime_data.tot_in_packets - runtime_data.tot_in_packets_prev;
-        if received_packets_entry + sent_packets_entry
-            > u128::from(notifications.packets_notification.threshold.unwrap())
-        {
-            // log this notification
-            emitted_notifications += 1;
-            if runtime_data.logged_notifications.len() >= 30 {
-                runtime_data.logged_notifications.pop_back();
-            }
-            runtime_data.logged_notifications.push_front(
-                LoggedNotification::PacketsThresholdExceeded(PacketsThresholdExceeded {
-                    threshold: notifications.packets_notification.previous_threshold,
-                    incoming: received_packets_entry.try_into().unwrap(),
-                    outgoing: sent_packets_entry.try_into().unwrap(),
-                    timestamp: Local::now().to_string().get(11..19).unwrap().to_string(),
-                }),
-            );
-            if notifications.packets_notification.sound.ne(&Sound::None) {
-                // emit sound
-                play(
-                    notifications.packets_notification.sound,
-                    notifications.volume,
-                );
-                already_emitted_sound = true;
-            }
-        }
-    }
-    // bytes threshold
-    if notifications.bytes_notification.threshold.is_some() {
-        let sent_bytes_entry = runtime_data.tot_out_bytes - runtime_data.tot_out_bytes_prev;
-        let received_bytes_entry = runtime_data.tot_in_bytes - runtime_data.tot_in_bytes_prev;
-        if received_bytes_entry + sent_bytes_entry
-            > u128::from(notifications.bytes_notification.threshold.unwrap())
-        {
+    let mut sound_to_play = Sound::None;
+    let emitted_notifications_prev = logged_notifications.1;
+    let timestamp = info_traffic_msg.last_packet_timestamp;
+    let data_info = info_traffic_msg.tot_data_info;
+    // data threshold
+    if let Some(threshold) = notifications.data_notification.threshold {
+        let chart_type = notifications.data_notification.chart_type;
+        if data_info.tot_data(chart_type) > u128::from(threshold) {
             //log this notification
-            emitted_notifications += 1;
-            if runtime_data.logged_notifications.len() >= 30 {
-                runtime_data.logged_notifications.pop_back();
+            logged_notifications.1 += 1;
+            if logged_notifications.0.len() >= 30 {
+                logged_notifications.0.pop_back();
             }
-            runtime_data.logged_notifications.push_front(
-                LoggedNotification::BytesThresholdExceeded(BytesThresholdExceeded {
-                    threshold: notifications.bytes_notification.previous_threshold,
-                    incoming: received_bytes_entry.try_into().unwrap(),
-                    outgoing: sent_bytes_entry.try_into().unwrap(),
-                    timestamp: Local::now().to_string().get(11..19).unwrap().to_string(),
-                }),
-            );
-            if !already_emitted_sound && notifications.bytes_notification.sound.ne(&Sound::None) {
-                // emit sound
-                play(notifications.bytes_notification.sound, notifications.volume);
-                already_emitted_sound = true;
+            logged_notifications
+                .0
+                .push_front(LoggedNotification::DataThresholdExceeded(
+                    DataThresholdExceeded {
+                        id: logged_notifications.1,
+                        chart_type,
+                        threshold: notifications.data_notification.previous_threshold,
+                        data_info,
+                        timestamp: get_formatted_timestamp(timestamp),
+                        is_expanded: false,
+                        hosts: hosts_list(info_traffic_msg, chart_type),
+                        services: services_list(info_traffic_msg, chart_type),
+                    },
+                ));
+            if sound_to_play.eq(&Sound::None) {
+                sound_to_play = notifications.data_notification.sound;
             }
         }
     }
     // from favorites
-    if notifications.favorite_notification.notify_on_favorite
-        && !info_traffic
-            .lock()
-            .unwrap()
-            .favorites_last_interval
-            .is_empty()
-    {
-        let info_traffic_lock = info_traffic.lock().unwrap();
-        for host in &info_traffic_lock.favorites_last_interval.clone() {
-            //log this notification
-            emitted_notifications += 1;
-            if runtime_data.logged_notifications.len() >= 30 {
-                runtime_data.logged_notifications.pop_back();
-            }
+    if notifications.favorite_notification.notify_on_favorite {
+        let favorites_last_interval: HashSet<(Host, DataInfoHost)> = info_traffic_msg
+            .hosts
+            .iter()
+            .filter(|(h, _)| favorites.contains(h))
+            .map(|(h, data)| (h.clone(), *data))
+            .collect();
+        if !favorites_last_interval.is_empty() {
+            for (host, data_info_host) in favorites_last_interval {
+                //log this notification
+                logged_notifications.1 += 1;
+                if logged_notifications.0.len() >= 30 {
+                    logged_notifications.0.pop_back();
+                }
 
-            runtime_data
-                .logged_notifications
-                .push_front(LoggedNotification::FavoriteTransmitted(
-                    FavoriteTransmitted {
-                        host: host.clone(),
-                        data_info_host: *info_traffic_lock.hosts.get(host).unwrap(),
-                        timestamp: Local::now().to_string().get(11..19).unwrap().to_string(),
-                    },
-                ));
-        }
-        drop(info_traffic_lock);
-        if !already_emitted_sound && notifications.favorite_notification.sound.ne(&Sound::None) {
-            // emit sound
-            play(
-                notifications.favorite_notification.sound,
-                notifications.volume,
-            );
+                logged_notifications
+                    .0
+                    .push_front(LoggedNotification::FavoriteTransmitted(
+                        FavoriteTransmitted {
+                            id: logged_notifications.1,
+                            host,
+                            data_info_host,
+                            timestamp: get_formatted_timestamp(timestamp),
+                        },
+                    ));
+            }
+            if sound_to_play.eq(&Sound::None) {
+                sound_to_play = notifications.favorite_notification.sound;
+            }
         }
     }
 
-    emitted_notifications
+    // don't play sound when importing data from pcap file
+    if matches!(cs, CaptureSource::Device(_)) {
+        play(sound_to_play, notifications.volume);
+    }
+
+    logged_notifications.1 - emitted_notifications_prev
+}
+
+fn hosts_list(info_traffic_msg: &InfoTraffic, chart_type: ChartType) -> Vec<(Host, DataInfoHost)> {
+    let mut hosts: Vec<(Host, DataInfoHost)> = info_traffic_msg
+        .hosts
+        .iter()
+        .map(|(h, data)| (h.clone(), *data))
+        .collect();
+    hosts.sort_by(|(_, a), (_, b)| {
+        a.data_info
+            .compare(&b.data_info, SortType::Descending, chart_type)
+    });
+    let n_entry = min(hosts.len(), 4);
+    hosts
+        .get(..n_entry)
+        .unwrap_or_default()
+        .to_owned()
+        .into_iter()
+        .collect()
+}
+
+fn services_list(
+    info_traffic_msg: &InfoTraffic,
+    chart_type: ChartType,
+) -> Vec<(Service, DataInfo)> {
+    let mut services: Vec<(Service, DataInfo)> = info_traffic_msg
+        .services
+        .iter()
+        .filter(|(service, _)| service != &&Service::NotApplicable)
+        .map(|(s, data)| (*s, *data))
+        .collect();
+    services.sort_by(|(_, a), (_, b)| a.compare(b, SortType::Descending, chart_type));
+    let n_entry = min(services.len(), 4);
+    services
+        .get(..n_entry)
+        .unwrap_or_default()
+        .to_owned()
+        .into_iter()
+        .collect()
 }

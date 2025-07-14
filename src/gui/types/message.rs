@@ -1,10 +1,12 @@
 use iced::window;
+use std::net::IpAddr;
 
 use crate::gui::components::types::my_modal::MyModal;
 use crate::gui::pages::types::running_page::RunningPage;
 use crate::gui::pages::types::settings_page::SettingsPage;
 use crate::gui::styles::types::gradient_type::GradientType;
-use crate::networking::types::host::Host;
+use crate::networking::types::host::{Host, HostMessage};
+use crate::networking::types::info_traffic::InfoTraffic;
 use crate::notifications::types::notifications::Notification;
 use crate::report::types::search_parameters::SearchParameters;
 use crate::report::types::sort_type::SortType;
@@ -15,12 +17,12 @@ use crate::{ChartType, IpVersion, Language, Protocol, ReportSortType, StyleType}
 #[derive(Debug, Clone)]
 /// Messages types that permit reacting to application interactions/subscriptions
 pub enum Message {
-    /// Every 5 seconds
-    TickInit,
-    /// Every 1 second
-    TickRun,
-    /// Select adapter
-    AdapterSelection(String),
+    /// Run tasks to initialize the app
+    StartApp(Option<window::Id>),
+    /// Sent by the backend parsing packets; includes the capture id, new data, new hosts batched data, and whether an offline capture has finished
+    TickRun(usize, InfoTraffic, Vec<HostMessage>, bool),
+    /// Select network device
+    DeviceSelection(String),
     /// Select IP filter
     IpVersionSelection(IpVersion, bool),
     /// Select protocol filter
@@ -49,8 +51,6 @@ pub enum Message {
     Style(StyleType),
     /// Deserialize a style from a path
     LoadStyle(String),
-    /// Manage waiting time
-    Waiting,
     /// Displays a modal
     ShowModal(MyModal),
     /// Opens the specified settings page
@@ -65,7 +65,7 @@ pub enum Message {
     ChangeRunningPage(RunningPage),
     /// Select language
     LanguageSelection(Language),
-    /// Set packets notification
+    /// Set notification settings
     UpdateNotificationSettings(Notification, bool),
     /// Clear all received notifications
     ClearAllNotifications,
@@ -106,7 +106,7 @@ pub enum Message {
     /// Save the configurations of the app and quit
     Quit,
     /// Copies the given string to clipboard
-    CopyIp(String),
+    CopyIp(IpAddr),
     /// Launch a new file dialog
     OpenFile(String, FileInfo, fn(String) -> Message),
     /// Toggle export pcap file
@@ -123,6 +123,16 @@ pub enum Message {
     CtrlTPressed,
     /// Edit scale factor via keyboard shortcut
     ScaleFactorShortcut(bool),
-    /// Set the window ID
-    WindowId(Option<window::Id>),
+    /// Set new release status
+    SetNewerReleaseStatus(Option<bool>),
+    /// Set the pcap import path
+    SetPcapImport(String),
+    /// Sent by the backend parsing packets at the end of an offline capture; includes all the pending hosts
+    PendingHosts(usize, Vec<HostMessage>),
+    /// Sent by offline captures: ticks without packets
+    OfflineGap(usize, u32),
+    /// Emitted every second to repeat certain tasks (such as fetching the network devices)
+    Periodic,
+    /// Expand or collapse the given logged notification
+    ExpandNotification(usize, bool),
 }

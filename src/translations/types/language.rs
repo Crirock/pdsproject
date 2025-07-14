@@ -1,18 +1,20 @@
 use std::fmt;
 
-use iced::widget::svg::Handle;
 use iced::widget::Svg;
+use iced::widget::svg::Handle;
 use serde::{Deserialize, Serialize};
 
-use crate::countries::flags_pictures::{
-    CN, DE, ES, FI, FLAGS_WIDTH_BIG, FR, GB, GR, IT, JP, KR, PL, PT, RO, RU, SE, TR, UA, UZ, VN,
-};
 use crate::StyleType;
+use crate::countries::flags_pictures::{
+    CN, DE, ES, FI, FLAGS_WIDTH_BIG, FR, GB, GR, ID, IT, JP, KR, PL, PT, RO, RU, SE, TR, TW, UA,
+    UZ, VN,
+};
 
 /// This enum defines the available languages.
-#[derive(PartialEq, Eq, Clone, Copy, Debug, Serialize, Deserialize, Hash)]
+#[derive(PartialEq, Eq, Clone, Copy, Debug, Serialize, Deserialize, Hash, Default)]
 pub enum Language {
-    /// English (default language).
+    /// English.
+    #[default]
     EN,
     /// Italian.
     IT,
@@ -28,6 +30,9 @@ pub enum Language {
     UK,
     /// Simplified Chinese
     ZH,
+    /// Traditional Chinese
+    #[allow(non_camel_case_types)]
+    ZH_TW,
     /// Romanian
     RO,
     /// Korean
@@ -52,22 +57,19 @@ pub enum Language {
     UZ,
     /// Vietnamese
     VI,
-}
-
-impl Default for Language {
-    fn default() -> Self {
-        Self::EN
-    }
+    /// Indonesian
+    ID,
 }
 
 impl Language {
-    pub const ALL: [Language; 19] = [
+    pub const ALL: [Language; 21] = [
         Language::EN,
         Language::DE,
         Language::EL,
         Language::ES,
         Language::FI,
         Language::FR,
+        Language::ID,
         Language::IT,
         Language::JA,
         Language::KO,
@@ -81,11 +83,13 @@ impl Language {
         Language::UZ,
         Language::VI,
         Language::ZH,
+        Language::ZH_TW,
     ];
 
     pub fn get_flag<'a>(self) -> Svg<'a, StyleType> {
         Svg::new(Handle::from_memory(Vec::from(match self {
             Language::ZH => CN,
+            Language::ZH_TW => TW,
             Language::DE => DE,
             Language::ES => ES,
             Language::FR => FR,
@@ -105,30 +109,13 @@ impl Language {
             Language::JA => JP,
             Language::UZ => UZ,
             Language::VI => VN,
+            Language::ID => ID,
         })))
         .width(FLAGS_WIDTH_BIG)
     }
 
     pub fn is_up_to_date(self) -> bool {
-        matches!(
-            self,
-            Language::FR
-                | Language::EN
-                | Language::IT
-                | Language::DE
-                | Language::PL
-                | Language::RU
-                | Language::RO
-                | Language::JA
-                | Language::UZ
-                | Language::SV
-                | Language::VI
-                | Language::ZH
-                | Language::KO
-                | Language::TR
-                | Language::PT
-                | Language::UK
-        )
+        matches!(self, Language::EN | Language::IT)
     }
 }
 
@@ -143,6 +130,7 @@ impl fmt::Display for Language {
             Language::DE => "Deutsch",
             Language::UK => "Українська",
             Language::ZH => "简体中文",
+            Language::ZH_TW => "繁體中文",
             Language::RO => "Română",
             Language::KO => "한국어",
             Language::TR => "Türkçe",
@@ -155,6 +143,7 @@ impl fmt::Display for Language {
             Language::JA => "日本語",
             Language::UZ => "O'zbekcha",
             Language::VI => "Tiếng Việt",
+            Language::ID => "Bahasa Indonesia",
         };
         write!(f, "{self:?} - {lang_str}")
     }

@@ -1,7 +1,7 @@
 use iced::widget::Text;
 
-use crate::gui::styles::style_constants::ICONS;
 use crate::StyleType;
+use crate::gui::styles::style_constants::ICONS;
 
 pub enum Icon {
     ArrowBack,
@@ -14,25 +14,31 @@ pub enum Icon {
     Book,
     BytesThreshold,
     Clock,
+    // Collapse,
     Copy,
     Generals,
     Error,
+    // Expand,
+    Feedback,
     File,
     Forbidden,
     Funnel,
     GitHub,
-    Globe,
+    // Globe,
     HalfSun,
     Hourglass1,
     Hourglass2,
     Hourglass3,
     Inspect,
     Lightning,
+    Moon,
+    News,
     Notification,
     OpenLink,
     Overview,
     PacketsThreshold,
     // Restore,
+    Roadmap,
     Rocket,
     Settings,
     Sniffnet,
@@ -40,8 +46,10 @@ pub enum Icon {
     SortDescending,
     SortNeutral,
     Star,
+    Sun,
     ThumbnailOpen,
     ThumbnailClose,
+    Update,
     Warning,
     Waves,
 }
@@ -56,24 +64,26 @@ impl Icon {
             Icon::AudioHigh => 'Z',
             Icon::AudioMute => 'Y',
             Icon::Bin => 'h',
-            Icon::BytesThreshold => 'f',
+            Icon::BytesThreshold => '[',
             Icon::Clock => '9',
             Icon::Generals => 'Q',
             Icon::Error => 'U',
+            Icon::Feedback => '=',
             Icon::File => '8',
             Icon::Forbidden => 'x',
             Icon::Funnel => 'V',
             Icon::GitHub => 'H',
-            Icon::Globe => 'c',
+            // Icon::Globe => 'c',
             Icon::HalfSun => 'K',
             Icon::Hourglass1 => '1',
             Icon::Hourglass2 => '2',
             Icon::Hourglass3 => '3',
             Icon::Inspect => '5',
             Icon::Lightning => 'z',
+            Icon::Moon => 'G',
             Icon::Notification => '7',
             Icon::Overview => 'd',
-            Icon::PacketsThreshold => 'e',
+            Icon::PacketsThreshold => '\\',
             // Icon::Restore => 'k',
             Icon::Rocket => 'S',
             Icon::Settings => 'a',
@@ -85,10 +95,16 @@ impl Icon {
             Icon::SortAscending => 'm',
             Icon::SortDescending => 'l',
             Icon::SortNeutral => 'n',
+            Icon::Sun => 'F',
             Icon::OpenLink => 'o',
             Icon::ThumbnailOpen => 's',
             Icon::ThumbnailClose => 'r',
             Icon::Book => 'B',
+            Icon::Roadmap => '?',
+            Icon::News => '>',
+            Icon::Update => '<',
+            // Icon::Expand => 'p',
+            // Icon::Collapse => 'q',
         }
     }
 
@@ -98,10 +114,9 @@ impl Icon {
 
     pub fn get_hourglass<'a>(num: usize) -> Text<'a, StyleType> {
         match num {
-            1 => Icon::Hourglass1.to_text(),
             2 => Icon::Hourglass2.to_text(),
             3 => Icon::Hourglass3.to_text(),
-            _ => Text::new(""),
+            _ => Icon::Hourglass1.to_text(),
         }
     }
 }

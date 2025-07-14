@@ -3,12 +3,11 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::borrow::Cow;
-use std::sync::{Arc, Mutex};
-use std::{panic, process, thread};
 
+use iced::advanced::graphics::image::image_rs::ImageFormat;
 #[cfg(target_os = "linux")]
 use iced::window::settings::PlatformSpecific;
-use iced::{application, window, Font, Pixels, Settings};
+use iced::{Font, Pixels, Settings, application, window};
 
 use chart::types::chart_type::ChartType;
 use chart::types::traffic_chart::TrafficChart;
@@ -19,7 +18,6 @@ use gui::pages::types::running_page::RunningPage;
 use gui::sniffer::Sniffer;
 use gui::styles::style_constants::FONT_SIZE_BODY;
 use gui::styles::types::style_type::StyleType;
-use gui::types::runtime_data::RunTimeData;
 use networking::types::byte_multiple::ByteMultiple;
 use networking::types::info_traffic::InfoTraffic;
 use networking::types::ip_version::IpVersion;
@@ -30,10 +28,9 @@ use translations::types::language::Language;
 use utils::formatted_strings::print_cli_welcome_message;
 
 use crate::configs::types::config_window::{ConfigWindow, ToPosition, ToSize};
-use crate::configs::types::configs::{Configs, CONFIGS};
+use crate::configs::types::configs::{CONFIGS, Configs};
 use crate::gui::sniffer::FONT_FAMILY_NAME;
 use crate::gui::styles::style_constants::{ICONS_BYTES, SARASA_MONO_BOLD_BYTES, SARASA_MONO_BYTES};
-use crate::secondary_threads::check_updates::set_newer_release_status;
 
 mod chart;
 mod cli;
@@ -44,16 +41,17 @@ mod mmdb;
 mod networking;
 mod notifications;
 mod report;
-mod secondary_threads;
 mod translations;
 mod utils;
 
 pub const SNIFFNET_LOWERCASE: &str = "sniffnet";
 pub const SNIFFNET_TITLECASE: &str = "Sniffnet";
 
+const WINDOW_ICON: &[u8] = include_bytes!("../resources/logos/raw/icon.png");
+
 /// Entry point of application execution
 ///
-/// It initializes shared variables and loads configuration parameters
+/// It initializes variables and loads configuration parameters
 pub fn main() -> iced::Result {
     #[cfg(all(windows, not(debug_assertions)))]
     let _gag1: gag::Redirect<std::fs::File>;
@@ -68,37 +66,20 @@ pub fn main() -> iced::Result {
     let configs = CONFIGS.clone();
     let boot_task_chain = handle_cli_args();
 
-    let configs1 = Arc::new(Mutex::new(configs));
-    let configs2 = configs1.clone();
-
-    let newer_release_available1 = Arc::new(Mutex::new(None));
-    let newer_release_available2 = newer_release_available1.clone();
-
-    // kill the main thread as soon as a secondary thread panics
-    let orig_hook = panic::take_hook();
-    panic::set_hook(Box::new(move |panic_info| {
-        // invoke the default handler and exit the process
-        orig_hook(panic_info);
-        process::exit(1);
-    }));
-
-    // gracefully close the app when receiving SIGINT, SIGTERM, or SIGHUP
-    ctrlc::set_handler(move || {
-        configs2.lock().unwrap().clone().store();
-        process::exit(130);
-    })
-    .expect("Error setting Ctrl-C handler");
-
-    thread::Builder::new()
-        .name("thread_check_updates".to_string())
-        .spawn(move || {
-            set_newer_release_status(&newer_release_available2);
-        })
-        .unwrap();
+    #[cfg(debug_assertions)]
+    {
+        // kill the main thread as soon as a secondary thread panics
+        let orig_hook = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |panic_info| {
+            // invoke the default handler and exit the process
+            orig_hook(panic_info);
+            std::process::exit(1);
+        }));
+    }
 
     print_cli_welcome_message();
 
-    let ConfigWindow { size, position, .. } = configs1.lock().unwrap().window;
+    let ConfigWindow { size, position, .. } = configs.window;
 
     application(SNIFFNET_TITLECASE, Sniffer::update, Sniffer::view)
         .settings(Settings {
@@ -111,7 +92,7 @@ pub fn main() -> iced::Result {
             ],
             default_font: Font::with_name(FONT_FAMILY_NAME),
             default_text_size: Pixels(FONT_SIZE_BODY),
-            antialiasing: false,
+            antialiasing: true,
         })
         .window(window::Settings {
             size: size.to_size(), // start size
@@ -122,7 +103,7 @@ pub fn main() -> iced::Result {
             resizable: true,
             decorations: true,
             transparent: false,
-            icon: None,
+            icon: window::icon::from_file_data(WINDOW_ICON, Some(ImageFormat::Png)).ok(),
             #[cfg(target_os = "linux")]
             platform_specific: PlatformSpecific {
                 application_id: String::from(SNIFFNET_LOWERCASE),
@@ -134,10 +115,5 @@ pub fn main() -> iced::Result {
         .subscription(Sniffer::subscription)
         .theme(Sniffer::theme)
         .scale_factor(Sniffer::scale_factor)
-        .run_with(move || {
-            (
-                Sniffer::new(&configs1, newer_release_available1),
-                boot_task_chain,
-            )
-        })
+        .run_with(move || (Sniffer::new(configs), boot_task_chain))
 }

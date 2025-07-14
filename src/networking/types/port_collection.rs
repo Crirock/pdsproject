@@ -28,28 +28,22 @@ impl PortCollection {
             if object.contains(Self::RANGE_SEPARATOR) {
                 // port range
                 let mut subparts = object.split(Self::RANGE_SEPARATOR);
+                if subparts.clone().count() != 2 {
+                    return None;
+                }
                 let (lower_str, upper_str) =
                     (subparts.next().unwrap_or(""), subparts.next().unwrap_or(""));
-                let lower_port_res = u16::from_str(lower_str);
-                let upper_port_res = u16::from_str(upper_str);
-                if lower_port_res.is_ok() && upper_port_res.is_ok() {
-                    let lower_port = lower_port_res.unwrap();
-                    let upper_port = upper_port_res.unwrap();
-                    let range = RangeInclusive::new(lower_port, upper_port);
-                    if range.is_empty() {
-                        return None;
-                    }
-                    ranges.push(range);
-                } else {
+                let lower_port = u16::from_str(lower_str).ok()?;
+                let upper_port = u16::from_str(upper_str).ok()?;
+                let range = RangeInclusive::new(lower_port, upper_port);
+                if range.is_empty() {
                     return None;
                 }
+                ranges.push(range);
             } else {
                 // individual port
-                if let Ok(port) = u16::from_str(object) {
-                    ports.push(port);
-                } else {
-                    return None;
-                }
+                let port = u16::from_str(object).ok()?;
+                ports.push(port);
             }
         }
 
@@ -57,17 +51,17 @@ impl PortCollection {
     }
 
     pub(crate) fn contains(&self, port: Option<u16>) -> bool {
-        // ignore port filter in case of ICMP
-        if port.is_none() {
+        // ignore port filter in case of ICMP or ARP
+        let Some(p) = port else {
             return true;
-        }
+        };
 
         for range in &self.ranges {
-            if range.contains(&port.unwrap()) {
+            if range.contains(&p) {
                 return true;
             }
         }
-        self.ports.contains(&port.unwrap())
+        self.ports.contains(&p)
     }
 }
 
@@ -158,6 +152,10 @@ mod tests {
         assert_eq!(PortCollection::new("999-1"), None);
 
         assert_eq!(PortCollection::new("1:999"), None);
+
+        assert_eq!(PortCollection::new("1-2-3"), None);
+
+        assert_eq!(PortCollection::new("1-2-"), None);
     }
 
     #[test]

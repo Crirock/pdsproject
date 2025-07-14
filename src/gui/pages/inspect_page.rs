@@ -4,17 +4,17 @@ use iced::widget::scrollable::Direction;
 use iced::widget::text::LineHeight;
 use iced::widget::text_input::Side;
 use iced::widget::tooltip::Position;
+use iced::widget::{Button, Column, Container, Row, Scrollable, Text, TextInput};
 use iced::widget::{
-    button, combo_box, horizontal_space, text_input, vertical_space, ComboBox, Rule, Space,
-    Toggler, Tooltip,
+    ComboBox, Rule, Space, Toggler, Tooltip, button, combo_box, horizontal_space, text_input,
+    vertical_space,
 };
-use iced::widget::{lazy, Button, Column, Container, Row, Scrollable, Text, TextInput};
-use iced::{alignment, Alignment, Font, Length, Padding, Pixels};
+use iced::{Alignment, Font, Length, Padding, Pixels, alignment};
 
 use crate::chart::types::chart_type::ChartType;
 use crate::gui::components::tab::get_pages_tabs;
 use crate::gui::components::types::my_modal::MyModal;
-use crate::gui::pages::overview_page::get_bars;
+use crate::gui::pages::overview_page::{get_bars, get_bars_length};
 use crate::gui::styles::button::ButtonType;
 use crate::gui::styles::container::ContainerType;
 use crate::gui::styles::scrollbar::ScrollbarType;
@@ -24,7 +24,7 @@ use crate::gui::styles::text_input::TextInputType;
 use crate::gui::types::message::Message;
 use crate::networking::types::address_port_pair::AddressPortPair;
 use crate::networking::types::byte_multiple::ByteMultiple;
-use crate::networking::types::data_info::DataInfoWithoutTimestamp;
+use crate::networking::types::data_info::DataInfo;
 use crate::networking::types::host_data_states::HostStates;
 use crate::networking::types::info_address_port_pair::InfoAddressPortPair;
 use crate::networking::types::traffic_direction::TrafficDirection;
@@ -43,7 +43,7 @@ use crate::{ConfigSettings, Language, ReportSortType, RunningPage, Sniffer, Styl
 pub fn inspect_page(sniffer: &Sniffer) -> Container<Message, StyleType> {
     let ConfigSettings {
         style, language, ..
-    } = sniffer.configs.lock().unwrap().settings;
+    } = sniffer.configs.settings;
     let font = style.get_extension().font;
     let font_headers = style.get_extension().font_headers;
 
@@ -65,17 +65,7 @@ pub fn inspect_page(sniffer: &Sniffer) -> Container<Message, StyleType> {
 
     tab_and_body = tab_and_body.push(tabs);
 
-    let report = lazy(
-        (
-            sniffer.runtime_data.tot_out_packets + sniffer.runtime_data.tot_in_packets,
-            style,
-            language,
-            sniffer.report_sort_type,
-            sniffer.search.clone(),
-            sniffer.page_number,
-        ),
-        move |_| lazy_report(sniffer),
-    );
+    let report = report(sniffer);
 
     let col_report = Column::new()
         .height(Length::Fill)
@@ -114,10 +104,10 @@ pub fn inspect_page(sniffer: &Sniffer) -> Container<Message, StyleType> {
     Container::new(Column::new().push(tab_and_body.push(body))).height(Length::Fill)
 }
 
-fn lazy_report<'a>(sniffer: &Sniffer) -> Column<'a, Message, StyleType> {
+fn report<'a>(sniffer: &Sniffer) -> Column<'a, Message, StyleType> {
     let ConfigSettings {
         style, language, ..
-    } = sniffer.configs.lock().unwrap().settings;
+    } = sniffer.configs.settings;
     let font = style.get_extension().font;
 
     let (search_results, results_number, agglomerate) = get_searched_entries(sniffer);
@@ -128,7 +118,7 @@ fn lazy_report<'a>(sniffer: &Sniffer) -> Column<'a, Message, StyleType> {
         .align_x(Alignment::Start);
 
     let mut scroll_report = Column::new().align_x(Alignment::Start);
-    let start_entry_num = (sniffer.page_number - 1) * 20 + 1;
+    let start_entry_num = (sniffer.page_number.saturating_sub(1)) * 20 + 1;
     let end_entry_num = start_entry_num + search_results.len() - 1;
     for report_entry in search_results {
         scroll_report = scroll_report.push(
@@ -559,21 +549,14 @@ fn get_button_change_page<'a>(increment: bool) -> Button<'a, Message, StyleType>
 
 fn get_agglomerates_row<'a>(
     font: Font,
-    tot: DataInfoWithoutTimestamp,
+    tot: DataInfo,
     chart_type: ChartType,
 ) -> Row<'a, Message, StyleType> {
-    let tot_packets = tot.incoming_packets + tot.outgoing_packets;
-    let tot_bytes = tot.incoming_bytes + tot.outgoing_bytes;
-    let width = ReportCol::FILTER_COLUMNS_WIDTH;
+    let tot_packets = tot.tot_packets();
+    let tot_bytes = tot.tot_bytes();
 
-    #[allow(clippy::cast_precision_loss)]
-    let in_length = if chart_type == ChartType::Packets {
-        width * (tot.incoming_packets as f32 / tot_packets as f32)
-    } else {
-        width * (tot.incoming_bytes as f32 / tot_bytes as f32)
-    };
-    let out_length = width - in_length;
-    let bars = get_bars(in_length, out_length);
+    let (in_length, out_length) = get_bars_length(chart_type, &tot, &tot);
+    let bars = get_bars(in_length, out_length).width(ReportCol::FILTER_COLUMNS_WIDTH);
 
     let bytes_col = Column::new()
         .align_x(Alignment::Center)
@@ -656,7 +639,7 @@ mod tests {
     #[test]
     fn test_table_titles_display_and_tooltip_values_for_each_language() {
         // check glyph len when adding new language...
-        assert_eq!(Language::ALL.len(), 19);
+        assert_eq!(Language::ALL.len(), 21);
         for report_col in ReportCol::ALL {
             for language in Language::ALL {
                 let (title, title_small, tooltip_val) =

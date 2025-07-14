@@ -1,6 +1,10 @@
 use std::fmt;
 use std::hash::Hash;
 
+use crate::gui::styles::custom_themes::a11y::{
+    A11Y_DARK_PALETTE, A11Y_DARK_PALETTE_EXTENSION, A11Y_LIGHT_PALETTE,
+    A11Y_LIGHT_PALETTE_EXTENSION,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::gui::styles::custom_themes::dracula::{
@@ -14,10 +18,6 @@ use crate::gui::styles::custom_themes::gruvbox::{
 use crate::gui::styles::custom_themes::nord::{
     NORD_DARK_PALETTE, NORD_DARK_PALETTE_EXTENSION, NORD_LIGHT_PALETTE,
     NORD_LIGHT_PALETTE_EXTENSION,
-};
-use crate::gui::styles::custom_themes::oled::{
-    OLED_DARK_PALETTE, OLED_DARK_PALETTE_EXTENSION, OLED_LIGHT_PALETTE,
-    OLED_LIGHT_PALETTE_EXTENSION,
 };
 use crate::gui::styles::custom_themes::solarized::{
     SOLARIZED_DARK_PALETTE, SOLARIZED_DARK_PALETTE_EXTENSION, SOLARIZED_LIGHT_PALETTE,
@@ -46,6 +46,7 @@ impl CustomPalette {
 /// Built in extra styles
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "custom", content = "attributes")]
+#[allow(clippy::large_enum_variant)]
 pub enum ExtraStyles {
     DraculaDark,
     DraculaLight,
@@ -55,8 +56,8 @@ pub enum ExtraStyles {
     NordLight,
     SolarizedDark,
     SolarizedLight,
-    OledDark,
-    OledLight,
+    A11yDark,
+    A11yLight,
     CustomToml(CustomPalette),
 }
 
@@ -72,8 +73,8 @@ impl ExtraStyles {
             ExtraStyles::NordLight => *NORD_LIGHT_PALETTE,
             ExtraStyles::SolarizedDark => *SOLARIZED_DARK_PALETTE,
             ExtraStyles::SolarizedLight => *SOLARIZED_LIGHT_PALETTE,
-            ExtraStyles::OledDark => *OLED_DARK_PALETTE,
-            ExtraStyles::OledLight => *OLED_LIGHT_PALETTE,
+            ExtraStyles::A11yDark => *A11Y_DARK_PALETTE,
+            ExtraStyles::A11yLight => *A11Y_LIGHT_PALETTE,
             ExtraStyles::CustomToml(custom_palette) => custom_palette.palette,
         }
     }
@@ -89,8 +90,8 @@ impl ExtraStyles {
             ExtraStyles::NordLight => *NORD_LIGHT_PALETTE_EXTENSION,
             ExtraStyles::SolarizedDark => *SOLARIZED_DARK_PALETTE_EXTENSION,
             ExtraStyles::SolarizedLight => *SOLARIZED_LIGHT_PALETTE_EXTENSION,
-            ExtraStyles::OledDark => *OLED_DARK_PALETTE_EXTENSION,
-            ExtraStyles::OledLight => *OLED_LIGHT_PALETTE_EXTENSION,
+            ExtraStyles::A11yDark => *A11Y_DARK_PALETTE_EXTENSION,
+            ExtraStyles::A11yLight => *A11Y_LIGHT_PALETTE_EXTENSION,
             ExtraStyles::CustomToml(custom_palette) => custom_palette.extension,
         }
     }
@@ -98,6 +99,8 @@ impl ExtraStyles {
     /// Slice of all implemented custom styles
     pub const fn all_styles() -> &'static [Self] {
         &[
+            ExtraStyles::A11yDark,
+            ExtraStyles::A11yLight,
             ExtraStyles::DraculaDark,
             ExtraStyles::DraculaLight,
             ExtraStyles::GruvboxDark,
@@ -106,8 +109,6 @@ impl ExtraStyles {
             ExtraStyles::NordLight,
             ExtraStyles::SolarizedDark,
             ExtraStyles::SolarizedLight,
-            ExtraStyles::OledDark,
-            ExtraStyles::OledLight,
         ]
     }
 }
@@ -115,16 +116,11 @@ impl ExtraStyles {
 impl fmt::Display for ExtraStyles {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
-            ExtraStyles::DraculaLight => write!(f, "Dracula (Day)"),
-            ExtraStyles::DraculaDark => write!(f, "Dracula (Night)"),
-            ExtraStyles::GruvboxDark => write!(f, "Gruvbox (Night)"),
-            ExtraStyles::GruvboxLight => write!(f, "Gruvbox (Day)"),
-            ExtraStyles::NordLight => write!(f, "Nord (Day)"),
-            ExtraStyles::NordDark => write!(f, "Nord (Night)"),
-            ExtraStyles::SolarizedLight => write!(f, "Solarized (Day)"),
-            ExtraStyles::SolarizedDark => write!(f, "Solarized (Night)"),
-            ExtraStyles::OledLight => write!(f, "OLED (Day)"),
-            ExtraStyles::OledDark => write!(f, "OLED (Night)"),
+            ExtraStyles::DraculaLight | ExtraStyles::DraculaDark => write!(f, "Dracula"),
+            ExtraStyles::GruvboxDark | ExtraStyles::GruvboxLight => write!(f, "Gruvbox"),
+            ExtraStyles::NordLight | ExtraStyles::NordDark => write!(f, "Nord"),
+            ExtraStyles::SolarizedLight | ExtraStyles::SolarizedDark => write!(f, "Solarized"),
+            ExtraStyles::A11yLight | ExtraStyles::A11yDark => write!(f, "A11y"),
             // Custom style names aren't used anywhere so this shouldn't be reached
             ExtraStyles::CustomToml(_) => unreachable!(),
         }
