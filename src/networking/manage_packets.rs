@@ -256,7 +256,7 @@ pub fn modify_or_insert_in_map(
     icmp_type: IcmpType,
     arp_type: ArpType,
     exchanged_bytes: u128,
-) -> (TrafficDirection, Service) {
+) -> (TrafficDirection, Service, String) {
     let mut traffic_direction = TrafficDirection::default();
     let mut service = Service::Unknown;
     let mut process = "-".to_string();
@@ -331,7 +331,11 @@ pub fn modify_or_insert_in_map(
             },
         });
 
-    (new_info.traffic_direction, new_info.service)
+    (
+        new_info.traffic_direction,
+        new_info.service,
+        new_info.process.clone(),
+    )
 }
 
 /// Returns the traffic direction observed (incoming or outgoing)

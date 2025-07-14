@@ -107,6 +107,8 @@ pub struct Sniffer {
     pub host_sort_type: SortType,
     /// Service sort type (overview page)
     pub service_sort_type: SortType,
+    /// Process sort type (overview page)
+    pub process_sort_type: SortType,
     /// Currently displayed modal; None if no modal is displayed
     pub modal: Option<MyModal>,
     /// Currently displayed settings page; None if settings is closed
@@ -164,6 +166,7 @@ impl Sniffer {
             report_sort_type: ReportSortType::default(),
             host_sort_type: SortType::default(),
             service_sort_type: SortType::default(),
+            process_sort_type: SortType::default(),
             modal: None,
             settings_page: None,
             last_opened_setting: SettingsPage::Notifications,
@@ -459,6 +462,9 @@ impl Sniffer {
             }
             Message::ServiceSortSelection(sort_type) => {
                 self.service_sort_type = sort_type;
+            }
+            Message::ProcessSortSelection(sort_type) => {
+                self.process_sort_type = sort_type;
             }
             Message::ToggleExportPcap => {
                 self.export_pcap.toggle();

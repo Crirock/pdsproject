@@ -115,3 +115,23 @@ pub fn get_service_entries(
         .map(|&(service, data_info)| (*service, *data_info))
         .collect()
 }
+
+pub fn get_process_entries(
+    info_traffic: &InfoTraffic,
+    chart_type: ChartType,
+    sort_type: SortType,
+) -> Vec<(String, DataInfo)> {
+    let mut sorted_vec: Vec<(&String, &DataInfo)> = info_traffic
+        .processes
+        .iter()
+        .filter(|(process, _)| process != &"-")
+        .collect();
+
+    sorted_vec.sort_by(|&(_, a), &(_, b)| a.compare(b, sort_type, chart_type));
+
+    let n_entry = min(sorted_vec.len(), 30);
+    sorted_vec[0..n_entry]
+        .iter()
+        .map(|&(process, data_info)| (process.clone(), *data_info))
+        .collect()
+}

@@ -95,6 +95,14 @@ impl SearchParameters {
             ..SearchParameters::default()
         }
     }
+
+    pub fn new_process_search(process: &str) -> Self {
+        Self {
+            // todo: with equal prefix?
+            process: process.to_string(),
+            ..SearchParameters::default()
+        }
+    }
 }
 
 #[derive(Copy, Clone)]
