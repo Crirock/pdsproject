@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::ffi::{CStr, c_int};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 use etherparse::{EtherType, LaxPacketHeaders, LinkHeader, NetHeaders, TransportHeader};
@@ -17,6 +18,12 @@ use crate::networking::types::service_query::ServiceQuery;
 use crate::networking::types::traffic_direction::TrafficDirection;
 use crate::networking::types::traffic_type::TrafficType;
 use crate::{IpVersion, Protocol};
+use cocoa::base::{id, nil};
+use cocoa::foundation::{NSSize, NSString};
+use iced::widget::Image;
+use iced::widget::image::Handle;
+use image::{GenericImageView, RgbaImage};
+use objc::{class, msg_send, sel, sel_impl};
 use std::fmt::Write;
 
 include!(concat!(env!("OUT_DIR"), "/services.rs"));
@@ -256,10 +263,11 @@ pub fn modify_or_insert_in_map(
     icmp_type: IcmpType,
     arp_type: ArpType,
     exchanged_bytes: u128,
-) -> (TrafficDirection, Service, String) {
+) -> (TrafficDirection, Service, String, Option<Handle>) {
     let mut traffic_direction = TrafficDirection::default();
     let mut service = Service::Unknown;
     let mut process = "-".to_string();
+    let mut picon = None;
 
     if !info_traffic_msg.map.contains_key(key) {
         // first occurrence of key (in this time interval)
@@ -284,7 +292,38 @@ pub fn modify_or_insert_in_map(
                 .into_iter()
                 .flatten()
                 .next()
-                .map_or("?".to_string(), |p| p.name);
+                .map_or("?".to_string(), |p| {
+                    let path = get_executable_path(p.pid as i32);
+                    let mut image: Option<iced::widget::Image> = None;
+                    println!("Process: {} (PID: {})", p.name, p.pid);
+                    if let Some(app_path) = path {
+                        println!("--> Exe path: {}", app_path);
+                        if let Some(bundle_path) = find_app_bundle_path(&app_path) {
+                            println!("--> Bundle path: {}", bundle_path);
+                            if let Some(tiff) = get_icon_tiff_bytes(&bundle_path) {
+                                let img =
+                                    image::load_from_memory(&tiff).expect("Failed to decode image");
+                                // resize the image
+                                let resized =
+                                    img.resize_exact(64, 64, image::imageops::FilterType::Lanczos3);
+                                let (width, height) = resized.dimensions();
+                                println!("--> Icon size: {}x{}", width, height);
+                                // crop the image
+                                let sub =
+                                    image::imageops::crop_imm(&resized, 6, 6, 52, 52).to_image();
+                                let (width, height) = sub.dimensions();
+                                println!("--> Cropped icon size: {}x{}", width, height);
+
+                                picon = Some(iced::widget::image::Handle::from_rgba(
+                                    width,
+                                    height,
+                                    sub.into_raw(),
+                                ));
+                            }
+                        }
+                    }
+                    p.name
+                });
         }
     }
 
@@ -335,7 +374,68 @@ pub fn modify_or_insert_in_map(
         new_info.traffic_direction,
         new_info.service,
         new_info.process.clone(),
+        picon,
     )
+}
+
+unsafe extern "C" {
+    fn proc_pidpath(pid: c_int, buffer: *mut libc::c_void, buffersize: u32) -> c_int;
+}
+
+fn get_executable_path(pid: i32) -> Option<String> {
+    let mut buf = vec![0u8; libc::PROC_PIDPATHINFO_MAXSIZE as usize];
+    let ret = unsafe { proc_pidpath(pid, buf.as_mut_ptr() as *mut _, buf.len() as u32) };
+
+    if ret > 0 {
+        let path = CStr::from_bytes_until_nul(&buf).unwrap();
+        Some(path.to_string_lossy().into_owned())
+    } else {
+        None
+    }
+}
+
+fn find_app_bundle_path(exe_path: &str) -> Option<String> {
+    let mut current = std::path::Path::new(exe_path);
+    let mut last_app_dir: Option<std::path::PathBuf> = None;
+
+    // Walk up the path, including the input
+    loop {
+        if let Some(file_name) = current.file_name() {
+            if file_name.to_string_lossy().ends_with(".app") {
+                last_app_dir = Some(current.to_path_buf());
+            }
+        }
+
+        match current.parent() {
+            Some(parent) => current = parent,
+            None => break,
+        }
+    }
+
+    last_app_dir.map(|p| p.to_string_lossy().into_owned())
+}
+
+fn get_icon_tiff_bytes(app_path: &str) -> Option<Vec<u8>> {
+    unsafe {
+        let ns_app_path: id = NSString::alloc(nil).init_str(app_path);
+        let workspace: id = msg_send![class!(NSWorkspace), sharedWorkspace];
+        let icon: id = msg_send![workspace, iconForFile: ns_app_path];
+
+        if icon == nil {
+            return None;
+        }
+
+        // Get TIFF representation (NSData)
+        let tiff_data: id = msg_send![icon, TIFFRepresentation];
+        if tiff_data == nil {
+            return None;
+        }
+
+        // Convert NSData to Vec<u8>
+        let length: usize = msg_send![tiff_data, length];
+        let bytes: *const u8 = msg_send![tiff_data, bytes];
+        Some(std::slice::from_raw_parts(bytes, length).to_vec())
+    }
 }
 
 /// Returns the traffic direction observed (incoming or outgoing)

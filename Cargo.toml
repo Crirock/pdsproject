@@ -58,6 +58,10 @@ clap = { version = "4.5.41", features = ["derive"] }
 tokio = { version = "1.46.1", features = ["macros"] }
 async-channel = "2.5.0"
 listeners = { git = "https://github.com/islameehassan/listeners" }
+cocoa = "0.24"
+objc = "0.2"
+libc = "0.2.174"
+image = "0.24"
 
 [target.'cfg(windows)'.dependencies]
 gag = "1.0.0"

@@ -6,6 +6,7 @@ use crate::networking::types::data_info_host::DataInfoHost;
 use crate::networking::types::host::Host;
 use crate::networking::types::info_address_port_pair::InfoAddressPortPair;
 use crate::utils::types::timestamp::Timestamp;
+use iced::widget::image::Handle;
 use std::collections::HashMap;
 
 /// Struct containing overall traffic statistics and data.
@@ -26,7 +27,7 @@ pub struct InfoTraffic {
     /// Map of the upper layer services with their data info
     pub services: HashMap<Service, DataInfo>,
     /// Map of the processes with their data info
-    pub processes: HashMap<String, DataInfo>,
+    pub processes: HashMap<String, (DataInfo, Option<Handle>)>,
     /// Map of the hosts with their data info
     pub hosts: HashMap<Host, DataInfoHost>,
 }
@@ -62,8 +63,8 @@ impl InfoTraffic {
         for (key, value) in &msg.processes {
             self.processes
                 .entry(key.clone())
-                .and_modify(|x| x.refresh(*value))
-                .or_insert(*value);
+                .and_modify(|x| x.0.refresh(value.0))
+                .or_insert(value.clone());
         }
 
         for (key, value) in &msg.hosts {

@@ -47,7 +47,7 @@ use iced::widget::scrollable::Direction;
 use iced::widget::text::LineHeight;
 use iced::widget::tooltip::Position;
 use iced::widget::{
-    Button, Column, Container, Row, Rule, Scrollable, Space, Text, Tooltip, button,
+    Button, Column, Container, Image, Row, Rule, Scrollable, Space, Text, Tooltip, button,
     horizontal_space, vertical_space,
 };
 use iced::{Alignment, Font, Length, Padding};
@@ -98,6 +98,8 @@ pub fn overview_page(sniffer: &Sniffer) -> Container<Message, StyleType> {
 
                 let container_info = col_info(sniffer);
 
+                let col_service = col_service(sniffer);
+
                 let container_report = row_report(sniffer);
 
                 body = body
@@ -110,7 +112,14 @@ pub fn overview_page(sniffer: &Sniffer) -> Container<Message, StyleType> {
                             .height(280)
                             .spacing(10)
                             .push(container_info)
-                            .push(container_chart),
+                            .push(container_chart)
+                            .push(
+                                Container::new(col_service)
+                                    .width(350)
+                                    .height(Length::Fill)
+                                    .padding(Padding::new(10.0).top(0).bottom(5))
+                                    .class(ContainerType::BorderedRound),
+                            ),
                     )
                     .push(container_report);
             }
@@ -222,28 +231,20 @@ fn body_pcap_error<'a>(
 
 fn row_report<'a>(sniffer: &Sniffer) -> Row<'a, Message, StyleType> {
     let col_host = col_host(sniffer);
-    let col_service = col_service(sniffer);
     let col_process = col_process(sniffer);
 
     Row::new()
         .spacing(10)
         .push(
             Container::new(col_host)
-                .width(Length::FillPortion(5))
-                .height(Length::Fill)
-                .padding(Padding::new(10.0).top(0).bottom(5))
-                .class(ContainerType::BorderedRound),
-        )
-        .push(
-            Container::new(col_service)
-                .width(Length::FillPortion(2))
+                .width(Length::FillPortion(6))
                 .height(Length::Fill)
                 .padding(Padding::new(10.0).top(0).bottom(5))
                 .class(ContainerType::BorderedRound),
         )
         .push(
             Container::new(col_process)
-                .width(Length::FillPortion(2))
+                .width(Length::FillPortion(4))
                 .height(Length::Fill)
                 .padding(Padding::new(10.0).top(0).bottom(5))
                 .class(ContainerType::BorderedRound),
@@ -410,11 +411,11 @@ fn col_process<'a>(sniffer: &Sniffer) -> Column<'a, Message, StyleType> {
     let entries = get_process_entries(&sniffer.info_traffic, chart_type, sniffer.process_sort_type);
     let first_entry_data_info = entries
         .iter()
-        .map(|&(_, d)| d)
-        .max_by(|d1, d2| d1.compare(d2, SortType::Ascending, chart_type))
-        .unwrap_or_default();
+        .map(|&(_, (d, _))| d)
+        .max_by(|d1, d2| d1.compare(&d2, SortType::Ascending, chart_type))
+        .unwrap();
 
-    for (process, data_info) in &entries {
+    for (process, (data_info, handle)) in &entries {
         let content = simpler_bar(
             process.to_string(),
             data_info,
@@ -424,12 +425,22 @@ fn col_process<'a>(sniffer: &Sniffer) -> Column<'a, Message, StyleType> {
         );
 
         scroll_process = scroll_process.push(
-            button(content)
-                .padding(Padding::new(5.0).right(15).left(10))
-                .on_press(Message::Search(SearchParameters::new_process_search(
-                    process,
-                )))
-                .class(ButtonType::Neutral),
+            button(
+                Row::new()
+                    .spacing(5)
+                    .align_y(Vertical::Center)
+                    .push_maybe(
+                        handle
+                            .clone()
+                            .map(|h| Image::new(h).height(FLAGS_HEIGHT_BIG)),
+                    )
+                    .push(content),
+            )
+            .padding(Padding::new(5.0).right(15).left(10))
+            .on_press(Message::Search(SearchParameters::new_process_search(
+                process,
+            )))
+            .class(ButtonType::Neutral),
         );
     }
 
@@ -588,7 +599,7 @@ fn col_info<'a>(sniffer: &Sniffer) -> Container<'a, Message, StyleType> {
         .push(donut_row.height(Length::Fill));
 
     Container::new(content)
-        .width(400)
+        .width(350)
         .padding(Padding::new(5.0).top(10))
         .align_x(Alignment::Center)
         .class(ContainerType::BorderedRound)
