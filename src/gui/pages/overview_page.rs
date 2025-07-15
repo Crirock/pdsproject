@@ -413,7 +413,7 @@ fn col_process<'a>(sniffer: &Sniffer) -> Column<'a, Message, StyleType> {
         .iter()
         .map(|&(_, (d, _))| d)
         .max_by(|d1, d2| d1.compare(&d2, SortType::Ascending, chart_type))
-        .unwrap();
+        .unwrap_or_default();
 
     for (process, (data_info, handle)) in &entries {
         let content = simpler_bar(
