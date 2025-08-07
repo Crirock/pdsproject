@@ -98,7 +98,20 @@ pub fn overview_page(sniffer: &Sniffer) -> Container<Message, StyleType> {
 
                 let container_info = col_info(sniffer);
 
-                let col_service = col_service(sniffer);
+                let container_service = if f64::from(sniffer.configs.window.size.0)
+                    / sniffer.configs.settings.scale_factor
+                    > 1100.0
+                {
+                    Some(
+                        Container::new(col_service(sniffer))
+                            .width(300)
+                            .height(Length::Fill)
+                            .padding(Padding::new(10.0).top(0).bottom(5))
+                            .class(ContainerType::BorderedRound),
+                    )
+                } else {
+                    None
+                };
 
                 let container_report = row_report(sniffer);
 
@@ -113,13 +126,7 @@ pub fn overview_page(sniffer: &Sniffer) -> Container<Message, StyleType> {
                             .spacing(10)
                             .push(container_info)
                             .push(container_chart)
-                            .push(
-                                Container::new(col_service)
-                                    .width(350)
-                                    .height(Length::Fill)
-                                    .padding(Padding::new(10.0).top(0).bottom(5))
-                                    .class(ContainerType::BorderedRound),
-                            ),
+                            .push_maybe(container_service),
                     )
                     .push(container_report);
             }
@@ -599,7 +606,7 @@ fn col_info<'a>(sniffer: &Sniffer) -> Container<'a, Message, StyleType> {
         .push(donut_row.height(Length::Fill));
 
     Container::new(content)
-        .width(350)
+        .width(400)
         .padding(Padding::new(5.0).top(10))
         .align_x(Alignment::Center)
         .class(ContainerType::BorderedRound)

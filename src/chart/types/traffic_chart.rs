@@ -289,7 +289,7 @@ impl Chart<Message> for TrafficChart {
                 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
                 &|bytes| ByteMultiple::formatted_string(bytes.abs() as u128)
             })
-            .x_labels(min(6, x_labels))
+            .x_labels(min(3, x_labels))
             .x_label_formatter(
                 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
                 &|seconds| get_formatted_num_seconds(seconds.abs() as u128),
@@ -318,16 +318,16 @@ impl Chart<Message> for TrafficChart {
             .log_err(location!());
 
         // chart legend
-        if !self.thumbnail {
-            let _ = chart
-                .configure_series_labels()
-                .position(SeriesLabelPosition::UpperRight)
-                .background_style(buttons_color.mix(0.6))
-                .border_style(buttons_color.stroke_width(CHARTS_LINE_BORDER * 2))
-                .label_font(self.font(13.5))
-                .draw()
-                .log_err(location!());
-        }
+        // if !self.thumbnail {
+        //     let _ = chart
+        //         .configure_series_labels()
+        //         .position(SeriesLabelPosition::UpperRight)
+        //         .background_style(buttons_color.mix(0.6))
+        //         .border_style(buttons_color.stroke_width(CHARTS_LINE_BORDER * 2))
+        //         .label_font(self.font(13.5))
+        //         .draw()
+        //         .log_err(location!());
+        // }
     }
 }
 
