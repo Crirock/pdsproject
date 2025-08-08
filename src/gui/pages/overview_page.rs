@@ -415,14 +415,14 @@ fn col_process<'a>(sniffer: &Sniffer) -> Column<'a, Message, StyleType> {
     let mut scroll_process = Column::new()
         .padding(Padding::ZERO.right(11.0))
         .align_x(Alignment::Center);
-    let entries = get_process_entries(&sniffer.info_traffic, chart_type, sniffer.process_sort_type);
+    let entries = get_process_entries(&sniffer.processes, chart_type, sniffer.process_sort_type);
     let first_entry_data_info = entries
         .iter()
-        .map(|&(_, (d, _))| d)
+        .map(|&(_, d)| d)
         .max_by(|d1, d2| d1.compare(&d2, SortType::Ascending, chart_type))
         .unwrap_or_default();
 
-    for (process, (data_info, handle)) in &entries {
+    for (process, data_info) in &entries {
         let content = simpler_bar(
             process.to_string(),
             data_info,
@@ -436,11 +436,11 @@ fn col_process<'a>(sniffer: &Sniffer) -> Column<'a, Message, StyleType> {
                 Row::new()
                     .spacing(5)
                     .align_y(Vertical::Center)
-                    .push_maybe(
-                        handle
-                            .clone()
-                            .map(|h| Image::new(h).height(FLAGS_HEIGHT_BIG)),
-                    )
+                    // .push_maybe(
+                    //     handle
+                    //         .clone()
+                    //         .map(|h| Image::new(h).height(FLAGS_HEIGHT_BIG)),
+                    // )
                     .push(content),
             )
             .padding(Padding::new(5.0).right(15).left(10))

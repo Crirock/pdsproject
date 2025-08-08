@@ -13,6 +13,7 @@ use crate::networking::types::icmp_type::{IcmpType, IcmpTypeV4, IcmpTypeV6};
 use crate::networking::types::info_address_port_pair::InfoAddressPortPair;
 use crate::networking::types::info_traffic::InfoTraffic;
 use crate::networking::types::packet_filters_fields::PacketFiltersFields;
+use crate::networking::types::process::Process;
 use crate::networking::types::service::Service;
 use crate::networking::types::service_query::ServiceQuery;
 use crate::networking::types::traffic_direction::TrafficDirection;
@@ -265,11 +266,11 @@ pub fn modify_or_insert_in_map(
     icmp_type: IcmpType,
     arp_type: ArpType,
     exchanged_bytes: u128,
-) -> (TrafficDirection, Service, String, Option<Handle>) {
+) -> (TrafficDirection, Service) {
     let mut traffic_direction = TrafficDirection::default();
     let mut service = Service::Unknown;
-    let mut process = "?".to_string();
-    let mut picon = None;
+    // let mut process = "?".to_string();
+    // let mut picon = None;
 
     if !info_traffic_msg.map.contains_key(key) {
         // first occurrence of key (in this time interval)
@@ -288,42 +289,42 @@ pub fn modify_or_insert_in_map(
         // determine upper layer service
         service = get_service(key, traffic_direction, my_interface_addresses);
         // determine process
-        if let Some(local_port) = get_local_port(key, traffic_direction) {
-            let processes = get_processes();
-            let pid = processes.get(&local_port).unwrap_or(&0);
-            let path = get_executable_path(*pid as i32);
-            let mut image: Option<iced::widget::Image> = None;
-            // println!("Process: {} (PID: {})", path, p.pid);
-            if let Some(app_path) = path {
-                process = Path::new(&app_path)
-                    .file_name()
-                    .unwrap_or_default()
-                    .to_string_lossy()
-                    .to_string();
-                // println!("--> Exe path: {}", app_path);
-                if let Some(bundle_path) = find_app_bundle_path(&app_path) {
-                    // println!("--> Bundle path: {}", bundle_path);
-                    if let Some(tiff) = get_icon_tiff_bytes(&bundle_path) {
-                        let img = image::load_from_memory(&tiff).expect("Failed to decode image");
-                        // resize the image
-                        let resized =
-                            img.resize_exact(64, 64, image::imageops::FilterType::Lanczos3);
-                        let (width, height) = resized.dimensions();
-                        // println!("--> Icon size: {}x{}", width, height);
-                        // crop the image
-                        let sub = image::imageops::crop_imm(&resized, 6, 6, 52, 52).to_image();
-                        let (width, height) = sub.dimensions();
-                        // println!("--> Cropped icon size: {}x{}", width, height);
-
-                        picon = Some(iced::widget::image::Handle::from_rgba(
-                            width,
-                            height,
-                            sub.into_raw(),
-                        ));
-                    }
-                }
-            }
-        }
+        // if let Some(local_port) = get_local_port(key, traffic_direction) {
+        //     let processes = get_processes();
+        //     let pid = processes.get(&local_port).unwrap_or(&0);
+        //     let path = get_executable_path(*pid as i32);
+        //     let mut image: Option<iced::widget::Image> = None;
+        //     // println!("Process: {} (PID: {})", path, p.pid);
+        //     if let Some(app_path) = path {
+        //         process = Path::new(&app_path)
+        //             .file_name()
+        //             .unwrap_or_default()
+        //             .to_string_lossy()
+        //             .to_string();
+        //         // println!("--> Exe path: {}", app_path);
+        //         if let Some(bundle_path) = find_app_bundle_path(&app_path) {
+        //             // println!("--> Bundle path: {}", bundle_path);
+        //             if let Some(tiff) = get_icon_tiff_bytes(&bundle_path) {
+        //                 let img = image::load_from_memory(&tiff).expect("Failed to decode image");
+        //                 // resize the image
+        //                 let resized =
+        //                     img.resize_exact(64, 64, image::imageops::FilterType::Lanczos3);
+        //                 let (width, height) = resized.dimensions();
+        //                 // println!("--> Icon size: {}x{}", width, height);
+        //                 // crop the image
+        //                 let sub = image::imageops::crop_imm(&resized, 6, 6, 52, 52).to_image();
+        //                 let (width, height) = sub.dimensions();
+        //                 // println!("--> Cropped icon size: {}x{}", width, height);
+        //
+        //                 picon = Some(iced::widget::image::Handle::from_rgba(
+        //                     width,
+        //                     height,
+        //                     sub.into_raw(),
+        //                 ));
+        //             }
+        //         }
+        //     }
+        // }
     }
 
     let timestamp = info_traffic_msg.last_packet_timestamp;
@@ -355,7 +356,11 @@ pub fn modify_or_insert_in_map(
             initial_timestamp: timestamp,
             final_timestamp: timestamp,
             service,
-            process,
+            process: if matches!(key.protocol, Protocol::ICMP | Protocol::ARP) {
+                Process::NotApplicable
+            } else {
+                Process::Unknown
+            },
             traffic_direction,
             icmp_types: if key.protocol.eq(&Protocol::ICMP) {
                 HashMap::from([(icmp_type, 1)])
@@ -369,65 +374,7 @@ pub fn modify_or_insert_in_map(
             },
         });
 
-    (
-        new_info.traffic_direction,
-        new_info.service,
-        new_info.process.clone(),
-        picon,
-    )
-}
-
-fn get_processes() -> HashMap<u16, u32> {
-    let output = Command::new("nettop")
-        .args(&["-n", "-L", "1", "-J", ""])
-        .output()
-        .unwrap();
-
-    if !output.status.success() {
-        return HashMap::new();
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-
-    let mut map = HashMap::new();
-    let mut current_pid: Option<u32> = None;
-
-    for line in stdout.lines() {
-        let line = line.trim().trim_end_matches(',');
-
-        if line.is_empty() {
-            continue;
-        }
-
-        // Detect process line: processName.PID
-        if let Some(dot_pos) = line.rfind('.') {
-            let pid_str = &line[dot_pos + 1..];
-            if let Ok(pid) = pid_str.parse::<u32>() {
-                current_pid = Some(pid);
-                continue;
-            }
-        }
-
-        // Parse connection line
-        if let Some(pid) = current_pid {
-            // Expect format like: tcp4 192.168.1.102:64694<->172.64.155.209:443
-            if let Some(space_pos) = line.find(' ') {
-                let addr = &line[space_pos + 1..];
-                if let Some((local, _remote)) = addr.split_once("<->") {
-                    // Extract port from local address (skip if wildcard)
-                    if let Some((_ip, port_str)) = local.rsplit_once(':') {
-                        if port_str != "*" {
-                            if let Ok(port) = port_str.parse::<u16>() {
-                                map.insert(port, pid);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    map
+    (new_info.traffic_direction, new_info.service)
 }
 
 unsafe extern "C" {

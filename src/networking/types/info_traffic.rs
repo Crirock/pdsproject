@@ -26,8 +26,6 @@ pub struct InfoTraffic {
     pub map: HashMap<AddressPortPair, InfoAddressPortPair>,
     /// Map of the upper layer services with their data info
     pub services: HashMap<Service, DataInfo>,
-    /// Map of the processes with their data info
-    pub processes: HashMap<String, (DataInfo, Option<Handle>)>,
     /// Map of the hosts with their data info
     pub hosts: HashMap<Host, DataInfoHost>,
 }
@@ -58,13 +56,6 @@ impl InfoTraffic {
                 .entry(*key)
                 .and_modify(|x| x.refresh(*value))
                 .or_insert(*value);
-        }
-
-        for (key, value) in &msg.processes {
-            self.processes
-                .entry(key.clone())
-                .and_modify(|x| x.0.refresh(value.0))
-                .or_insert(value.clone());
         }
 
         for (key, value) in &msg.hosts {

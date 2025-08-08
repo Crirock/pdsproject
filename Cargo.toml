@@ -57,7 +57,7 @@ splines = "5.0.0"
 clap = { version = "4.5.41", features = ["derive"] }
 tokio = { version = "1.46.1", features = ["macros"] }
 async-channel = "2.5.0"
-listeners = "0.3.0"
+listeners = { path = "../listeners" }
 cocoa = "0.24"
 objc = "0.2"
 libc = "0.2.174"

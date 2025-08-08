@@ -2,6 +2,7 @@ use crate::countries::types::country::Country;
 use crate::networking::types::address_port_pair::AddressPortPair;
 use crate::networking::types::host::Host;
 use crate::networking::types::info_address_port_pair::InfoAddressPortPair;
+use crate::networking::types::process::Process;
 use crate::networking::types::service::Service;
 
 /// Used to express the search filters applied to GUI inspect page
@@ -96,10 +97,9 @@ impl SearchParameters {
         }
     }
 
-    pub fn new_process_search(process: &str) -> Self {
+    pub fn new_process_search(process: &Process) -> Self {
         Self {
-            // todo: with equal prefix?
-            process: process.to_string(),
+            process: process.to_string_with_equal_prefix(),
             ..SearchParameters::default()
         }
     }
@@ -195,7 +195,7 @@ impl FilterInputType {
             }
             FilterInputType::Proto => key.protocol.to_string(),
             FilterInputType::Service => value.service.to_string(),
-            FilterInputType::Process => value.process.clone(),
+            FilterInputType::Process => value.process.to_string(),
             FilterInputType::Country => r_dns_host
                 .unwrap_or(&(String::new(), Host::default()))
                 .1

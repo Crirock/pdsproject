@@ -1,22 +1,5 @@
 //! Module defining the application structure: messages, updates, subscriptions.
 
-use async_channel::Receiver;
-use iced::Event::{Keyboard, Window};
-use iced::keyboard::key::Named;
-use iced::keyboard::{Event, Key, Modifiers};
-use iced::mouse::Event::ButtonPressed;
-use iced::widget::Column;
-use iced::window::{Id, Level};
-use iced::{Element, Point, Size, Subscription, Task, window};
-use pcap::Device;
-use rfd::FileHandle;
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::net::IpAddr;
-use std::path::PathBuf;
-use std::sync::Arc;
-use std::thread;
-use std::time::Duration;
-
 use crate::configs::types::config_window::{
     ConfigWindow, PositionTuple, ScaleAndCheck, SizeTuple, ToPoint, ToSize,
 };
@@ -43,9 +26,11 @@ use crate::gui::types::timing_events::TimingEvents;
 use crate::mmdb::asn::ASN_MMDB;
 use crate::mmdb::country::COUNTRY_MMDB;
 use crate::mmdb::types::mmdb_reader::{MmdbReader, MmdbReaders};
+use crate::networking::manage_packets::get_local_port;
 use crate::networking::parse_packets::BackendTrafficMessage;
 use crate::networking::parse_packets::parse_packets;
 use crate::networking::types::capture_context::{CaptureContext, CaptureSource, MyPcapImport};
+use crate::networking::types::data_info::DataInfo;
 use crate::networking::types::filters::Filters;
 use crate::networking::types::host::{Host, HostMessage};
 use crate::networking::types::host_data_states::HostDataStates;
@@ -53,6 +38,9 @@ use crate::networking::types::info_traffic::InfoTraffic;
 use crate::networking::types::ip_collection::AddressCollection;
 use crate::networking::types::my_device::MyDevice;
 use crate::networking::types::port_collection::PortCollection;
+use crate::networking::types::process::Process;
+use crate::networking::types::protocol::Protocol;
+use crate::networking::types::service::Service;
 use crate::notifications::notify_and_log::notify_and_log;
 use crate::notifications::types::logged_notification::LoggedNotification;
 use crate::notifications::types::notifications::{DataNotification, Notification};
@@ -67,6 +55,22 @@ use crate::utils::error_logger::{ErrorLogger, Location};
 use crate::utils::types::file_info::FileInfo;
 use crate::utils::types::web_page::WebPage;
 use crate::{ConfigSettings, Configs, StyleType, TrafficChart, location};
+use async_channel::Receiver;
+use iced::Event::{Keyboard, Window};
+use iced::keyboard::key::Named;
+use iced::keyboard::{Event, Key, Modifiers};
+use iced::mouse::Event::ButtonPressed;
+use iced::widget::Column;
+use iced::window::{Id, Level};
+use iced::{Element, Point, Size, Subscription, Task, window};
+use pcap::Device;
+use rfd::FileHandle;
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::net::IpAddr;
+use std::path::PathBuf;
+use std::sync::Arc;
+use std::thread;
+use std::time::Duration;
 
 pub const FONT_FAMILY_NAME: &str = "Sarasa Mono SC for Sniffnet";
 pub const ICON_FONT_FAMILY_NAME: &str = "Icons for Sniffnet";
@@ -137,6 +141,14 @@ pub struct Sniffer {
     pub host_data_states: HostDataStates,
     /// Import path for PCAP file
     pub import_pcap_path: String,
+
+    /// TODO:
+    /// make both fields part of InfoTraffic, and send them from the backend
+    /// for what concerns listeners, send only the new ones (so that we can update the past unassigned traffic)
+    /// Listener processes
+    pub listeners: HashMap<(u16, listeners::Protocol), listeners::Process>,
+    /// Processes with their DataInfo
+    pub processes: HashMap<Process, DataInfo>,
 }
 
 impl Sniffer {
@@ -184,6 +196,8 @@ impl Sniffer {
             id: None,
             host_data_states: HostDataStates::default(),
             import_pcap_path: String::new(),
+            listeners: HashMap::new(),
+            processes: HashMap::new(),
         }
     }
 
@@ -556,6 +570,7 @@ impl Sniffer {
                 self.update_waiting_dots();
                 self.fetch_devices();
                 self.update_threshold();
+                self.fetch_listeners();
             }
             Message::ExpandNotification(id, expand) => {
                 if let Some(n) = self
@@ -687,6 +702,48 @@ impl Sniffer {
                 .notifications
                 .data_notification
                 .previous_threshold = temp_threshold.previous_threshold;
+        }
+    }
+
+    fn fetch_listeners(&mut self) {
+        let Ok(curr_listeners) = listeners::get_all() else {
+            return;
+        };
+        for l in curr_listeners.into_iter().filter(|l| l.socket.port() != 0) {
+            let port = l.socket.port();
+            let protocol = l.protocol;
+            self.listeners.insert((port, protocol), l.process);
+        }
+
+        for (k, v) in self
+            .info_traffic
+            .map
+            .iter_mut()
+            .filter(|(_, v)| v.process == Process::Unknown)
+        {
+            let protocol = match k.protocol {
+                Protocol::TCP => listeners::Protocol::TCP,
+                Protocol::UDP => listeners::Protocol::UDP,
+                _ => continue,
+            };
+            let local_port = get_local_port(k, v.traffic_direction).unwrap_or_default();
+            let Some(p) = self.listeners.get(&(local_port, protocol)) else {
+                continue;
+            };
+            let process = Process::Known(p.clone());
+            v.process = process.clone();
+            self.processes
+                .entry(process)
+                .and_modify(|x| {
+                    x.add_packets(
+                        v.transmitted_packets,
+                        v.transmitted_bytes,
+                        v.traffic_direction,
+                    )
+                })
+                .or_insert_with(|| {
+                    DataInfo::new_with_first_packet(v.transmitted_bytes, v.traffic_direction)
+                });
         }
     }
 

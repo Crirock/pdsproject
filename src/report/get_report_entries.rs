@@ -4,10 +4,12 @@ use crate::networking::types::data_info::DataInfo;
 use crate::networking::types::data_info_host::DataInfoHost;
 use crate::networking::types::host::Host;
 use crate::networking::types::info_address_port_pair::InfoAddressPortPair;
+use crate::networking::types::process::Process;
 use crate::report::types::sort_type::SortType;
 use crate::{ChartType, InfoTraffic, ReportSortType, Service, Sniffer};
 use iced::widget::image::Handle;
 use std::cmp::min;
+use std::collections::HashMap;
 
 /// Return the elements that satisfy the search constraints and belong to the given page,
 /// and the total number of elements which satisfy the search constraints,
@@ -117,17 +119,16 @@ pub fn get_service_entries(
 }
 
 pub fn get_process_entries(
-    info_traffic: &InfoTraffic,
+    processes: &HashMap<Process, DataInfo>,
     chart_type: ChartType,
     sort_type: SortType,
-) -> Vec<(String, (DataInfo, Option<Handle>))> {
-    let mut sorted_vec: Vec<(&String, &(DataInfo, Option<Handle>))> = info_traffic
-        .processes
+) -> Vec<(Process, DataInfo)> {
+    let mut sorted_vec: Vec<(&Process, &DataInfo)> = processes
         .iter()
-        .filter(|(process, _)| process != &"-")
+        .filter(|(process, _)| process != &&Process::NotApplicable)
         .collect();
 
-    sorted_vec.sort_by(|&(_, a), &(_, b)| a.0.compare(&b.0, sort_type, chart_type));
+    sorted_vec.sort_by(|&(_, a), &(_, b)| a.compare(&b, sort_type, chart_type));
 
     let n_entry = min(sorted_vec.len(), 30);
     sorted_vec[0..n_entry]

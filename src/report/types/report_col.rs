@@ -95,7 +95,7 @@ impl ReportCol {
             }
             ReportCol::Proto => key.protocol.to_string(),
             ReportCol::Service => val.service.to_string(),
-            ReportCol::Process => val.process.clone(),
+            ReportCol::Process => val.process.to_string(),
             ReportCol::Bytes => ByteMultiple::formatted_string(val.transmitted_bytes),
             ReportCol::Packets => val.transmitted_packets.to_string(),
         }

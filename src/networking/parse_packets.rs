@@ -144,7 +144,7 @@ pub fn parse_packets(
                             file.write(&packet);
                         }
                         // update the map
-                        let (traffic_direction, service, process, picon) = modify_or_insert_in_map(
+                        let (traffic_direction, service) = modify_or_insert_in_map(
                             &mut info_traffic_msg,
                             &key,
                             &cs,
@@ -273,23 +273,6 @@ pub fn parse_packets(
                             })
                             .or_insert_with(|| {
                                 DataInfo::new_with_first_packet(exchanged_bytes, traffic_direction)
-                            });
-
-                        //increment the packet count for the sniffed process
-                        info_traffic_msg
-                            .processes
-                            .entry(process)
-                            .and_modify(|data_info| {
-                                data_info.0.add_packet(exchanged_bytes, traffic_direction);
-                            })
-                            .or_insert_with(|| {
-                                (
-                                    DataInfo::new_with_first_packet(
-                                        exchanged_bytes,
-                                        traffic_direction,
-                                    ),
-                                    picon,
-                                )
                             });
                     }
 

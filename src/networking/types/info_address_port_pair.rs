@@ -1,13 +1,13 @@
 //! Module defining the `InfoAddressPortPair` struct, useful to format the output report file and
 //! to keep track of statistics about the sniffed traffic.
 
-use std::collections::HashMap;
-
 use crate::Service;
 use crate::networking::types::arp_type::ArpType;
 use crate::networking::types::icmp_type::IcmpType;
+use crate::networking::types::process::Process;
 use crate::networking::types::traffic_direction::TrafficDirection;
 use crate::utils::types::timestamp::Timestamp;
+use std::collections::HashMap;
 
 /// Struct useful to format the output report file and to keep track of statistics about the sniffed traffic.
 ///
@@ -29,7 +29,7 @@ pub struct InfoAddressPortPair {
     /// Upper layer service carried by the associated address:port pair.
     pub service: Service,
     /// Process using the local port of this connection.
-    pub process: String,
+    pub process: Process,
     /// Determines if the connection is incoming or outgoing
     pub traffic_direction: TrafficDirection,
     /// Types of the ICMP messages exchanged, with the relative count (this is empty if not ICMP)

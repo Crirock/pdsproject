@@ -18,6 +18,7 @@ pub mod my_device;
 pub mod my_link_type;
 pub mod packet_filters_fields;
 pub mod port_collection;
+pub mod process;
 pub mod protocol;
 pub mod service;
 pub mod service_query;
