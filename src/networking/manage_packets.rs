@@ -19,12 +19,8 @@ use crate::networking::types::service_query::ServiceQuery;
 use crate::networking::types::traffic_direction::TrafficDirection;
 use crate::networking::types::traffic_type::TrafficType;
 use crate::{IpVersion, Protocol};
-use cocoa::base::{id, nil};
-use cocoa::foundation::{NSSize, NSString};
 use iced::widget::Image;
 use iced::widget::image::Handle;
-use image::{GenericImageView, RgbaImage};
-use objc::{class, msg_send, sel, sel_impl};
 use std::fmt::Write;
 use std::path::Path;
 use std::process::Command;
@@ -377,21 +373,21 @@ pub fn modify_or_insert_in_map(
     (new_info.traffic_direction, new_info.service)
 }
 
-unsafe extern "C" {
-    fn proc_pidpath(pid: c_int, buffer: *mut libc::c_void, buffersize: u32) -> c_int;
-}
+// unsafe extern "C" {
+//     fn proc_pidpath(pid: c_int, buffer: *mut libc::c_void, buffersize: u32) -> c_int;
+// }
 
-fn get_executable_path(pid: i32) -> Option<String> {
-    let mut buf = vec![0u8; libc::PROC_PIDPATHINFO_MAXSIZE as usize];
-    let ret = unsafe { proc_pidpath(pid, buf.as_mut_ptr() as *mut _, buf.len() as u32) };
-
-    if ret > 0 {
-        let path = CStr::from_bytes_until_nul(&buf).unwrap();
-        Some(path.to_string_lossy().into_owned())
-    } else {
-        None
-    }
-}
+// fn get_executable_path(pid: i32) -> Option<String> {
+//     let mut buf = vec![0u8; libc::PROC_PIDPATHINFO_MAXSIZE as usize];
+//     let ret = unsafe { proc_pidpath(pid, buf.as_mut_ptr() as *mut _, buf.len() as u32) };
+//
+//     if ret > 0 {
+//         let path = CStr::from_bytes_until_nul(&buf).unwrap();
+//         Some(path.to_string_lossy().into_owned())
+//     } else {
+//         None
+//     }
+// }
 
 fn find_app_bundle_path(exe_path: &str) -> Option<String> {
     let mut current = std::path::Path::new(exe_path);
@@ -414,28 +410,28 @@ fn find_app_bundle_path(exe_path: &str) -> Option<String> {
     last_app_dir.map(|p| p.to_string_lossy().into_owned())
 }
 
-fn get_icon_tiff_bytes(app_path: &str) -> Option<Vec<u8>> {
-    unsafe {
-        let ns_app_path: id = NSString::alloc(nil).init_str(app_path);
-        let workspace: id = msg_send![class!(NSWorkspace), sharedWorkspace];
-        let icon: id = msg_send![workspace, iconForFile: ns_app_path];
-
-        if icon == nil {
-            return None;
-        }
-
-        // Get TIFF representation (NSData)
-        let tiff_data: id = msg_send![icon, TIFFRepresentation];
-        if tiff_data == nil {
-            return None;
-        }
-
-        // Convert NSData to Vec<u8>
-        let length: usize = msg_send![tiff_data, length];
-        let bytes: *const u8 = msg_send![tiff_data, bytes];
-        Some(std::slice::from_raw_parts(bytes, length).to_vec())
-    }
-}
+// fn get_icon_tiff_bytes(app_path: &str) -> Option<Vec<u8>> {
+//     unsafe {
+//         let ns_app_path: id = NSString::alloc(nil).init_str(app_path);
+//         let workspace: id = msg_send![class!(NSWorkspace), sharedWorkspace];
+//         let icon: id = msg_send![workspace, iconForFile: ns_app_path];
+//
+//         if icon == nil {
+//             return None;
+//         }
+//
+//         // Get TIFF representation (NSData)
+//         let tiff_data: id = msg_send![icon, TIFFRepresentation];
+//         if tiff_data == nil {
+//             return None;
+//         }
+//
+//         // Convert NSData to Vec<u8>
+//         let length: usize = msg_send![tiff_data, length];
+//         let bytes: *const u8 = msg_send![tiff_data, bytes];
+//         Some(std::slice::from_raw_parts(bytes, length).to_vec())
+//     }
+// }
 
 /// Returns the traffic direction observed (incoming or outgoing)
 fn get_traffic_direction(
