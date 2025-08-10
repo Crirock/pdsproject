@@ -21,6 +21,7 @@ use crate::networking::types::data_info::DataInfo;
 use crate::networking::types::data_info_host::DataInfoHost;
 use crate::networking::types::filters::Filters;
 use crate::networking::types::host::Host;
+use crate::networking::types::process::Process;
 use crate::report::get_report_entries::{
     get_host_entries, get_process_entries, get_service_entries,
 };
@@ -423,6 +424,10 @@ fn col_process<'a>(sniffer: &Sniffer) -> Column<'a, Message, StyleType> {
         .unwrap_or_default();
 
     for (process, data_info) in &entries {
+        let Process::Known(listener_process) = process else {
+            continue;
+        };
+
         let content = simpler_bar(
             process.to_string(),
             data_info,
@@ -436,11 +441,13 @@ fn col_process<'a>(sniffer: &Sniffer) -> Column<'a, Message, StyleType> {
                 Row::new()
                     .spacing(5)
                     .align_y(Vertical::Center)
-                    // .push_maybe(
-                    //     handle
-                    //         .clone()
-                    //         .map(|h| Image::new(h).height(FLAGS_HEIGHT_BIG)),
-                    // )
+                    .push_maybe(
+                        sniffer
+                            .picons
+                            .get(&listener_process.path)
+                            .clone()
+                            .map(|h| Image::new(h).height(FLAGS_HEIGHT_BIG)),
+                    )
                     .push(content),
             )
             .padding(Padding::new(5.0).right(15).left(10))

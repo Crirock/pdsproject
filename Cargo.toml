@@ -58,10 +58,7 @@ clap = { version = "4.5.41", features = ["derive"] }
 tokio = { version = "1.46.1", features = ["macros"] }
 async-channel = "2.5.0"
 listeners = { path = "../listeners" }
-#cocoa = "0.24"
-#objc = "0.2"
-#libc = "0.2.174"
-#image = "0.24"
+picon = { path = "../picon" }
 
 [target.'cfg(windows)'.dependencies]
 gag = "1.0.0"

@@ -60,7 +60,7 @@ use iced::Event::{Keyboard, Window};
 use iced::keyboard::key::Named;
 use iced::keyboard::{Event, Key, Modifiers};
 use iced::mouse::Event::ButtonPressed;
-use iced::widget::Column;
+use iced::widget::{Column, image};
 use iced::window::{Id, Level};
 use iced::{Element, Point, Size, Subscription, Task, window};
 use pcap::Device;
@@ -149,6 +149,8 @@ pub struct Sniffer {
     pub listeners: HashMap<(u16, listeners::Protocol), listeners::Process>,
     /// Processes with their DataInfo
     pub processes: HashMap<Process, DataInfo>,
+    /// Process icons
+    pub picons: HashMap<String, image::Handle>,
 }
 
 impl Sniffer {
@@ -198,6 +200,7 @@ impl Sniffer {
             import_pcap_path: String::new(),
             listeners: HashMap::new(),
             processes: HashMap::new(),
+            picons: HashMap::new(),
         }
     }
 
@@ -712,7 +715,14 @@ impl Sniffer {
         for l in curr_listeners.into_iter().filter(|l| l.socket.port() != 0) {
             let port = l.socket.port();
             let protocol = l.protocol;
+            let path = l.process.path.clone();
             self.listeners.insert((port, protocol), l.process);
+
+            if !self.picons.contains_key(&path) {
+                let bytes = picon::get_icon_by_path(&path);
+                let handle = image::Handle::from_bytes(bytes.bytes);
+                self.picons.insert(path, handle);
+            }
         }
 
         for (k, v) in self
